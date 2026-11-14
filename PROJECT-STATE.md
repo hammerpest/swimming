@@ -1,6 +1,8 @@
 # PROJECT-STATE: CCAS Swimming Carnival App
 
-Date: 13 November 2026, version i. Replaces 13 November version h and all earlier PROJECT-STATE files.
+Date: 15 November 2026, version j. Replaces 13 November version i and all earlier PROJECT-STATE files.
+
+Changes on 15 November 2026 (version j): the landing page (onlinecarnivals.au) now has its own PROJECT-STATE, in the local-only folder SWIM 2027- App/onlinecarnivals-admin (decision 191). Jordan approved design S1.48 version 4 (a school sign-in page; after signing in, the lanes with one Sign in button each). Built as Web Opt 1.0, not live yet. The swimming app is unchanged. Next numbers: decision 192, question 92, design S1.49, Swim Opt 2.30.
 
 Changes on 13 November 2026 (version i): Jordan said "Yes, push swimming". Swim Opt 2.29 (darker outlines) and versions g and h pushed to staging and main (f424a84). Checked live: /swimming/ and /swimming/staging/ show v2.29 and the new --lt-line in both themes; the parents page has the new colour; no console errors. Next numbers: decision 191, question 92, design S1.48, Swim Opt 2.30.
 
@@ -1249,6 +1251,7 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 163. (9 November 2026, answers question 78) Primary relays have two groups: Junior (ages 8, 9, 10) and Senior (ages 11, 12). Read as applying to both the freestyle and medley relays.
 162. (9 November 2026, answers question 77) Primary results go to the same next level as high school, in the same HY3 file layout (2.29, 2.30).
 161. (9 November 2026, answers question 76) Primary students swim every 50 m race (fly, back, free, breast), the 100 m freestyle and the 4 x 50 m relays. No 200 m freestyle for primary.
+191. (15 November 2026) The landing page moves to its own PROJECT-STATE (SWIM 2027- App/onlinecarnivals-admin/PROJECT-STATE.md, local only). onlinecarnivals.au becomes a school sign-in page (Supabase email and password in ccas-athletics-staging, web_ tables), design S1.48 version 4, Web Opt 1.0. landing/index.html in this repo is the old page: do not upload it again; the source is SWIM 2027- App/onlinecarnivals-site.
 190. (13 November 2026) Jordan said "lest get athlewtics to nearly ready like swimming,. then get cross country to the same level as the others. Go": athletics main gets the app and the landing page Athletics buttons open /athletics/ and /athletics/parents/ again (replaces the stop-gap in 188). Done the same day.
 189. (13 November 2026, cross country decision 5) Jordan approved darker dashed lines and outlines (--lt-line rgba(20,32,63,.5) light, rgba(255,255,255,.4) dark) and said all three carnival apps should be similar. Built as Swim Opt 2.29.
 188. (13 November 2026) Jordan said "staging": the landing page's Athletics buttons open athletics staging (/athletics/staging/ and /athletics/staging/parents/) until athletics main has the app.
