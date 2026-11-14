@@ -1,6 +1,8 @@
 # PROJECT-STATE: CCAS Swimming Carnival App
 
-Date: 15 November 2026, version j. Replaces 13 November version i and all earlier PROJECT-STATE files.
+Date: 15 November 2026, version k. Replaces 15 November version j and all earlier PROJECT-STATE files.
+
+Changes on 15 November 2026 (version k): Claude ran the half-day simulation (first stage of Jordan's full test: simulation, then Jordan's solo run on real devices, then the staff practice day). Brief: work/half-day-sim-brief.md. Report: work/half-day-sim-findings.md, screenshots in work/half-day-sim-shots/. Jordan said fix nothing, so no app, SQL, Supabase or GitHub change. 55 races ran on the staging link (Swim Opt 2.29) with every job on its own Playwright device (51 in the half-day run, 4 in a short extra run; 15 more in two runs stopped early to fix the test script), the real slip reader on drawn slips, the multitimer in real time for 100 m, and the 11 planned problems. 11 problems found: 2 Must fix before the practice day, 5 Should fix, 4 Nice to have (new problems 26 to 28 hold the main ones). The biggest: the server closes the live channel on the Recorder, Marshal and Organiser 15 to 25 seconds after they act, the app never rejoins, and the header still says "Online, all sent" (17 Recorder stalls in 51 races). Passed: every race matched Claude's own record; results, house points, age champions, CSV, full backup, HRIS list and Lock results all right; the built-in problems worked. Staging was left cleared (no races, race number 1, 620 students and settings kept, parents page off). Found on the way: the staging PINs are no longer the test PINs (1111 and so on), so tests/supabase_live.py, tests/flow.py and the practice pack PINs do not work on staging as written; Jordan gave this session the PINs (not written here). Ask now: Jordan picks which findings to fix and when (next step 39). Next numbers: decision 192, question 92, design S1.49, Swim Opt 2.30.
 
 Changes on 15 November 2026 (version j): the landing page (onlinecarnivals.au) now has its own PROJECT-STATE, in the local-only folder SWIM 2027- App/onlinecarnivals-admin (decision 191). Jordan approved design S1.48 version 4 (a school sign-in page; after signing in, the lanes with one Sign in button each). Built as Web Opt 1.0, not live yet. The swimming app is unchanged. Next numbers: decision 192, question 92, design S1.49, Swim Opt 2.30.
 
@@ -1326,6 +1328,10 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 
 ## 5. Current problems
 
+26. (15 November 2026, half-day simulation, finding 1, Must fix) Live updates stop: the server closes the private "carnival" channel on the Recorder, Marshal and Organiser 15 to 25 seconds after they save something; the app only handles "subscribed", so it never rejoins, and the header still says "Online, all sent". The Recorder then sees no new races, the Marshal badge shows an old race number, and the Organiser's results and Clear practice data use an old copy. A reload fixes it until the next close. The phones did not lose it.
+27. (15 November 2026, half-day simulation, finding 2, Must fix) A multitimer send that waited on the phone (no signal) replaced a time the Recorder had typed in the meantime, with no "Slip differs" note (race 43). Problem 20 was meant to be solved by 2.11; it may need the Recorder's save to be confirmed first.
+28. (15 November 2026, half-day simulation, finding 3, Should fix) Clear practice data deletes one record at a time from the Organiser device's copy; closing the page within seconds left 33 races, 21 photos and race number 53 on staging. The other 8 findings are in work/half-day-sim-findings.md.
+
 25. (13 November 2026) The school network's Fortinet web filter (FortiGuard DNS) blocks onlinecarnivals.au: the Mac on school Wi-Fi gets the "Fortiguard SDNS Blocked Page" certificate for every page there (swimming, athletics, the landing page), while github.com works. Staff devices on school Wi-Fi (practice sit-down, run-through) cannot open the apps at the new address until ICT allows the domain. Phones on mobile data, and Mingara's own network, are not affected by this filter. See question 91.
 
 1. SOLVED (2.13, 2.14): Supabase staging project set up and used by both links. The live project for real names is still to come (step 9).
@@ -1409,6 +1415,8 @@ Closed: question 52 (106); questions 51 and 53 (102, 103); 4-digit PINs (104); h
 ---
 
 ## 7. Exact next steps
+
+39. NEXT: Jordan reads work/half-day-sim-findings.md (11 problems: 2 Must fix, 5 Should fix, 4 Nice to have) and picks what gets fixed and when. The two Must fix items (problems 26 and 27) come before Jordan's solo run on real devices and the practice day (step 29). Any fix is a new Swim Opt (2.30 on) through checks 1 to 3. Also decide whether the test scripts get the new staging PINs (kept out of the repo) or staging goes back to the test PINs.
 
 Done: Swim Opt 2.7 on both links (3 November 2026: the job review's must-fix list, 2.33). Swim Opt 2.6 (phone Place Judge and Announcer, no Dead heat). Swim Opt 2.0 (port, Supabase, GitHub Pages); Swim Opt 2.1 (Option A colours, 48 px tap sizes, slip reader, Slip added ticks, slip photo on the Recorder, Replace slip box, odd slips sent in yellow); Swim Opt 2.2 (change marshalling after sending, job order); Swim Opt 2.3 (multitimer); Swim Opt 2.4 (multitimer fixes, screen stays on, confirmed on Jordan's iPhone 30 October 2026). All on both links; checks 1 to 3 passed for each.
 
