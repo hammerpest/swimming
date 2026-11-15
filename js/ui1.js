@@ -1,6 +1,6 @@
 /* ===== Swim Opt 1: app shell, PIN, header, shared helpers ===== */
 /* Swim Opt 2.15 (decision 157): the running version, shown in the Carnival Organiser badge. Update it with each release. */
-const APP_VERSION="2.29";
+const APP_VERSION="2.30";
 const JOBS=[
   {k:"marshal",n:1,name:"Marshal",badge:"MARSHAL",dev:"iPad",desc:"Put swimmers in lanes and send each heat"},
   {k:"judge",n:2,name:"Place Judge",badge:"PLACE JUDGE",dev:"iPad",desc:"Tap the top places in each heat"},
@@ -14,7 +14,7 @@ const A={
   peers:[],R:null,loaded:false,
   role:ssGet("swim_role",null),job:ssGet("swim_job",null),pin:"",pinErr:false,
   m:{phase:"start",k:null,x:null,g:null,lanes:{},heat:1,cur:1,open:null,filter:"",sent:[],msg:""},
-  j:{race:null},r:{race:null,since:Date.now(),errs:{}},s:{race:null,test:null,flash:null,err:null},slipImg:{},
+  j:{race:null,ann:null,mine:{}},r:{race:null,since:Date.now(),errs:{}},s:{race:null,test:null,flash:null,err:null},slipImg:{},
   a:{idx:null},res:{tab:"race",sex:"all",type:"all",age:"all"},o:{sec:"details",preview:null,text:""},
   menu:false,modal:null,renderPending:false,
   past:null,years:[],L:{},yearPicked:ssGet("swim_year",null)
@@ -43,7 +43,9 @@ function locked(){if(A.past)return true;return !!A.cfg.locked&&A.job!=="organise
 function localStamp(d){d=d||new Date();const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())}
 function curYear(){return (A.L.cfg&&A.L.cfg.date||A.cfg.date||"2027").slice(0,4)}
 let toastT=null;
-function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3000)}
+/* ms: how long it shows (3 seconds unless given). Swim Opt 2.30 (problem 11): "Clearing..." stays until the
+   clear is done and the next message replaces it */
+function toast(m,ms){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms||3000)}
 function students(){return [...A.roster.F,...A.roster.M,...A.extras]}
 function studentById(id){return students().find(s=>s.id===id)}
 function otherPeers(){return A.peers.filter(p=>p&&p.dev&&p.dev!==DEV)}
@@ -91,7 +93,7 @@ async function connect(){
   s.onCol("extras",l=>live("extras",l));
   s.onCol("heats",l=>live("heats",l.filter(h=>h&&h.race)));
   s.onCol("times",l=>live("times",Object.fromEntries(l.map(d=>[d._id,d]))));
-  s.onCol("finish",l=>live("finish",Object.fromEntries(l.map(d=>[d._id,d]))));
+  s.onCol("finish",l=>{live("finish",Object.fromEntries(l.map(d=>[d._id,d])));judgeReplaced()});
   s.onCol("slips",l=>live("slips",Object.fromEntries(l.map(d=>[d._id,d]))));
   s.onDoc("records/all",d=>live("records",(d&&d.list)||[]));
   s.onDoc("counter/race",d=>live("counter",(d&&Number(d.next))||1));
@@ -106,6 +108,8 @@ function announce(){
   const p={job:A.job||null,mk:null,rec:null,recSince:null};
   if(A.job==="marshal"&&A.m.phase==="lanes")p.mk=groupKey(A.m.k,A.m.x,A.m.g);
   if(A.job==="recorder"&&A.r.race!=null){p.rec=A.r.race;p.recSince=A.r.since}
+  /* Swim Opt 2.30 (decision 193): the race a Place Judge is on, so two judges on one race are told */
+  if(A.job==="judge"&&A.j.race!=null)p.jr=A.j.race;
   A.store.presence(p);
 }
 async function w(fn){
@@ -129,6 +133,8 @@ function renderHeader(){
     const n=s.pending();
     if(s.mode==="local"){live="This device only (test)";cls="off"}
     else if(n){live=plural(n,"change")+" waiting to send";cls="off"}
+    /* Swim Opt 2.30 (decision 192, problem 26): the live channel is down and being joined again */
+    else if(s.live===false){live="Reconnecting";cls="off"}
     else live=A.job==="organiser"?"Online, all saved":"Online, all sent";
   }
   const links=A.job==="announcer"?`<button type="button" class="hlink" data-act="goto" data-job="results">Full results</button><button type="button" class="hlink" data-act="goto" data-job="houses">Houses</button>`

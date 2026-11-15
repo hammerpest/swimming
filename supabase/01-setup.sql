@@ -370,10 +370,42 @@ begin
     using doc_id, patch;
 end $$;
 
+-- ---------- Clear practice data (decision 140), Swim Opt 2.30 (problem 28) ----------
+-- One call on the server, all or nothing: every race, time, place, slip record and added swimmer goes,
+-- the race number goes back to 1, results are unlocked and the run gets a new id. Students, settings,
+-- records and kept years stay. It no longer depends on the Organiser's own copy, or on the page staying
+-- open. The slip photos are then removed by the page (Supabase only lets the Storage API delete files).
+-- Only the Carnival Organiser, and not while a past year is open. "where true": Supabase refuses a
+-- delete with no where.
+create or replace function public.clear_practice(run_id text) returns integer
+language plpgsql volatile security definer set search_path = '' as $$
+declare n integer;
+begin
+  if private.my_role() is distinct from 'org' or private.in_past() then
+    raise exception 'Only the Carnival Organiser can clear practice data' using errcode = '42501';
+  end if;
+  select count(*) into n from public.heats;
+  delete from public.heats where true;
+  delete from public.times where true;
+  delete from public.finish where true;
+  delete from public.slips where true;
+  delete from public.extras where true;
+  insert into public.counter (id, doc) values ('race', '{"next":1}') on conflict (id) do nothing;
+  update public.counter
+    set doc = jsonb_build_object('next', 1, 'at', floor(extract(epoch from now()) * 1000)::bigint)
+    where id = 'race';
+  update public.config
+    set doc = doc || jsonb_build_object('locked', false, 'lockedAt', null, 'runId', coalesce(run_id, ''), 'notSwum', '[]'::jsonb)
+    where id = 'main';
+  return n;
+end $$;
+
 revoke all on function public.claim_role(text), public.my_role(), public.release_role(), public.set_year(text),
-  public.check_pin(text, text), public.next_race(text), public.doc_update(text, text, jsonb) from public, anon;
+  public.check_pin(text, text), public.next_race(text), public.doc_update(text, text, jsonb),
+  public.clear_practice(text) from public, anon;
 grant execute on function public.claim_role(text), public.my_role(), public.release_role(), public.set_year(text),
-  public.check_pin(text, text), public.next_race(text), public.doc_update(text, text, jsonb) to authenticated;
+  public.check_pin(text, text), public.next_race(text), public.doc_update(text, text, jsonb),
+  public.clear_practice(text) to authenticated;
 
 -- ---------- slip photos: private bucket "slips" ----------
 insert into storage.buckets (id, name, public) values ('slips', 'slips', false) on conflict (id) do nothing;

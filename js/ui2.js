@@ -207,9 +207,21 @@ function judgeRace(){
 /* Swim Opt 2.12: a multitimer race shows the Place Judge the live places (decision 154), so a judge
    change starts from what the results use; the judge's save then replaces the multitimer places */
 function judgeFin(r){const F=r.F||{};return F.multi&&Array.isArray(F.taps)?Object.assign({},F,{order:r.FO||[],seq:(r.FO||[]).flat()}):F}
+/* Swim Opt 2.30 (decision 193, problem 5): two Place Judges on one race. Each phone says so while the other
+   is on it, and a phone whose places were replaced by the other phone's save is told (never lost silently) */
+function judgeTwin(race){return otherPeers().some(p=>p.job==="judge"&&p.jr===race)}
+function judgeReplaced(){
+  if(A.job!=="judge"||A.past||A.j.race==null)return;
+  const key=rid(A.j.race),F=A.finish[key],mine=A.j.mine[key];
+  if(!F||mine==null||F.multi||!F.dev||F.dev===DEV)return;
+  const now=JSON.stringify(F.order||[]);
+  if(now!==mine){A.j.mine[key]=now;toast("Another Place Judge changed the places for Race "+A.j.race+".")}
+}
 function renderJudge(){
   const r=judgeRace();
   if(!r)return waitingCard("Waiting for the marshal","The first race appears here as soon as the marshal sends it.");
+  if(A.j.ann!==r.race){A.j.ann=r.race;setTimeout(announce)}
+  const twin=judgeTwin(r.race)?`<div class="msg warn">Another Place Judge is on Race ${r.race}. Only one phone should place each race.</div>`:"";
   const L=Number(A.cfg.lanes)||8;const fin=judgeFin(r);const order=fin.order||[];
   const placeOf=finishOrderFromTaps(order);
   const placed=Object.keys(placeOf).length;const need=r.need;
@@ -241,7 +253,7 @@ function renderJudge(){
      No Dead heat: the Place Judge always splits a heat; equal times across heats stay a tie */
   if(phoneJob())return `${lockBar()}<div class="racebar ph">${badge(r.race,"sm")}${info}</div>
     <div class="prompt ${done?"done":""}">${esc(prompt)}</div>
-    <div class="pool ph">${lanes}</div>
+    ${twin}<div class="pool ph">${lanes}</div>
     <div class="row" style="margin-top:12px">${goto}${reset}</div>
     <div class="pbar"><div class="wrap">${undo}${next.replace(" big","")}</div></div>`;
   return `${lockBar()}<div class="racebar">${badge(r.race,"xl")}${info}
@@ -249,7 +261,7 @@ function renderJudge(){
       ${next}
     </div>
     <div class="prompt ${done?"done":""}">${esc(prompt)}</div>
-    <div class="pool">${lanes}</div>
+    ${twin}<div class="pool">${lanes}</div>
     <div class="row" style="margin-top:12px">
       ${undo}
       ${reset}
@@ -276,7 +288,7 @@ async function saveFinish(r,order,undoable,extra){
      "fewer places confirmed" (ok), so the judge confirms again with Next race */
   const fewer=order.flat().length<(fin.order||[]).flat().length;
   const doc=Object.assign({order,seq:order.flat(),undo:undo.slice(-20),gen:r.gen||0,ck:T.checked?T.checkedAt||0:0,ok:!!fin.ok&&!fewer,at:Date.now(),dev:DEV},extra||{});
-  A.finish[key]=doc;recompute();render();
+  A.finish[key]=doc;A.j.mine[key]=JSON.stringify(order);recompute();render();
   await w(()=>A.store.set("finish/"+key,doc));
 }
 function judgeUndo(){const r=judgeRace();const fin=judgeFin(r);const undo=(fin.undo||[]).slice();

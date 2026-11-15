@@ -45,11 +45,21 @@ function slipMerge(a,b){
   if(a.race!=null&&b.race!=null){r.race=a.race;if(a.race!==b.race||(a.raceLow&&b.raceLow))r.raceUnsure=true}
   else{const one=a.race!=null?a:b,other=one===a?b:a;r.race=one.race;if(one.race!=null&&(one.raceLow||other.head))r.raceUnsure=true}
   const doubt=l=>{if(!r.unsure.includes(l))r.unsure.push(l)};
+  /* Swim Opt 2.30 (problem 7): the time on the slip agrees, to the hundredth, with its stop clock less the start
+     clock in this reading. That is a second, separate proof the time was read right. */
+  const clockOk=(x,l)=>x.start!=null&&x.clocks&&x.clocks[l]!=null&&x.lanes[l]!=null&&Math.abs((((x.clocks[l]-x.start)%3600000)+3600000)%3600000/10-x.lanes[l])<=1;
   for(const l of a.order.concat(b.order.filter(x=>!a.order.includes(x)))){
     const inA=a.lanes[l]!=null,inB=b.lanes[l]!=null;
     r.lanes[l]=inA?a.lanes[l]:b.lanes[l];r.order.push(l);
-    if(!inA||!inB||a.lanes[l]!==b.lanes[l])doubt(l);
-    else if(a.unsure.includes(l)&&b.unsure.includes(l))doubt(l);
+    /* Swim Opt 2.30 (problem 7): fewer right times go yellow. Found by one reading only: sure when that reading
+       was sure of it (confident digits and its clock agrees) and the other reading has that time under no
+       other lane (a misread lane number). Found by both with the same time: sure unless both were unsure and
+       neither clock agrees. Readings that differ always go yellow: every misread in the half-day run and in
+       the 70-slip bench was one of these. */
+    if(!inA||!inB){const one=inA?a:b,other=inA?b:a;
+      if(one.unsure.includes(l)||Object.keys(other.lanes).some(k=>+k!==+l&&other.lanes[k]===r.lanes[l]))doubt(l)}
+    else if(a.lanes[l]!==b.lanes[l])doubt(l);
+    else if(a.unsure.includes(l)&&b.unsure.includes(l)&&!clockOk(a,l)&&!clockOk(b,l))doubt(l);
   }
   for(const l of a.unsure.concat(b.unsure))if(r.lanes[l]!=null&&(a.problems.some(p=>p==="Lane "+l+" twice")||b.problems.some(p=>p==="Lane "+l+" twice")))doubt(l);
   for(const l of a.missed.concat(b.missed))if(r.lanes[l]==null&&!r.missed.includes(l))r.missed.push(l);

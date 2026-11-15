@@ -60,6 +60,22 @@ The test PINs (Marshal 1111, Place Judge 2222, Recorder 3333, Time Slips 4444, A
 
 The PINs are kept on the server only. Each device can try 5 wrong PINs in 5 minutes, then it has to wait.
 
+## 6. Updates to the tables (Swim Opt 2.30)
+
+Swim Opt 2.30 adds one server step: Clear practice data now runs on the server in one go (problem 28).
+
+1. Open the project, press **SQL Editor**, then **+ New query**.
+2. Copy all of `supabase/01-setup.sql` (the 2.30 version), paste it in and press **Run**. It is safe to run again: it keeps every race, PIN and setting.
+3. It should say **Success. No rows returned**.
+
+Until this is run, Clear practice data still works the old way (record by record, so keep the page open until the green line shows).
+
+Check for the late multitimer time (problem 27), read only: press **+ New query**, paste the line below, press **Run** and send Claude the result (a screenshot of the text is fine). It changes nothing.
+
+```sql
+select tgname, pg_get_functiondef('private.times_slip_merge'::regproc) like '%''multi''%' as handles_multitimer from pg_trigger where tgrelid = 'public.times'::regclass and not tgisinternal;
+```
+
 ## Before the carnival
 
 - Free projects pause after 7 days with nobody using them. The data is kept. To wake one, open the dashboard and press **Restore project**. Do this the day before the carnival.

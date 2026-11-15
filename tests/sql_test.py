@@ -305,6 +305,42 @@ admin.execute("update config set doc = doc || '{\"parents\": false}' where id = 
 check(pr() == {"off": True}, "parents: turned off again")
 admin.execute("delete from heats"); admin.execute("delete from times"); admin.execute("delete from finish"); admin.execute("delete from records")
 
+# Swim Opt 2.30 (problem 27): race 43 of the half-day run. The Recorder types lane 4 (doc_update makes the row),
+# then the multitimer send that waited on the phone arrives as an upsert: the typed time stays, the
+# multitimer time sits beside it as "slip"
+import json as _json
+r.ok("select doc_update('times', 'r0043', %s)", (_json.dumps({"lanes": {"4": {"t": 8193, "st": "ok", "src": "typed", "keep": False, "chk": False, "slip": None}}, "checked": False, "gen": 0, "by": "rec", "at": 1}),))
+mt = {"lanes": {str(l): {"t": t, "st": "ok", "src": "multi", "keep": False, "chk": False} for l, t in [(1, 8263), (2, 8038), (3, 9301), (4, 8156)]}, "src": "multi", "checked": False, "gen": 0, "by": "ph", "at": 2}
+s.ok("insert into times as t (id, doc, updated_at) values ('r0043', %s, now()) on conflict (id) do update set id = excluded.id, doc = excluded.doc, updated_at = excluded.updated_at", (_json.dumps(mt),))
+d = r.q("select doc from times where id='r0043'")[0][0]
+check(d["lanes"]["4"]["t"] == 8193 and d["lanes"]["4"]["src"] == "typed" and d["lanes"]["4"]["slip"] == 8156 and d["lanes"]["2"]["t"] == 8038,
+      "2.30: race 43 replay, a late multitimer upsert keeps the typed time and adds Slip differs (problem 27)")
+
+# Swim Opt 2.30 (problem 28): Clear practice data is one server call
+for t_ in ("heats", "times", "finish", "slips", "extras"): admin.execute(f"delete from {t_}")
+admin.execute("""insert into heats values ('r0001', '{"race":1}'), ('r0002', '{"race":2}')""")
+admin.execute("""insert into times values ('r0001', '{"lanes":{}}')""")
+admin.execute("""insert into finish values ('r0001', '{"order":[]}')""")
+admin.execute("""insert into slips values ('r0001', '{"race":1}')""")
+admin.execute("""insert into extras values ('x-1', '{"s":"A"}')""")
+admin.execute("""insert into archive values ('2026-data', '{"heats":[]}') on conflict (id) do nothing""")
+admin.execute("""update counter set doc = '{"next":53}' where id = 'race'""")
+admin.execute("""update config set doc = doc || '{"locked":true,"notSwum":["x"],"name":"Keep me"}' where id = 'main'""")
+check(not m.ok("select clear_practice('run1')"), "2.30: the Marshal cannot clear practice data")
+check(not r.ok("select clear_practice('run1')"), "2.30: the Recorder cannot clear practice data")
+check(o.q("select clear_practice('run1')")[0][0] == 2, "2.30: the organiser clears practice data in one call")
+left = {t: admin.execute(f"select count(*) from {t}").fetchone()[0] for t in ("heats", "times", "finish", "slips", "extras")}
+check(sum(left.values()) == 0, "2.30: no races, times, places, slips or added swimmers left")
+cfg = admin.execute("select doc from config where id='main'").fetchone()[0]
+check(admin.execute("select doc->>'next' from counter where id='race'").fetchone()[0] == "1" and cfg["runId"] == "run1"
+      and cfg["locked"] is False and cfg["notSwum"] == [] and cfg["name"] == "Keep me",
+      "2.30: race number back to 1, unlocked, new run id, other settings kept")
+check(admin.execute("select jsonb_array_length(doc->'students') from roster where id='F'").fetchone()[0] == 310
+      and admin.execute("select count(*) from archive").fetchone()[0] >= 1, "2.30: students and kept years stay")
+admin.execute("update private.sessions set year = '2026' where role = 'org'")
+check(not o.ok("select clear_practice('run2')"), "2.30: no clearing while a past year is open")
+admin.execute("update private.sessions set year = null where role = 'org'")
+
 srv.cleanup()
 print(f"\n{len(fails)} failed" if fails else "\nall passed")
 sys.exit(1 if fails else 0)

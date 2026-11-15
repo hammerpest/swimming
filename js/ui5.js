@@ -183,16 +183,27 @@ function newRunId(){return Date.now().toString(36)+Math.random().toString(36).sl
 /* A7 (decision 140): clear the practice run; students and settings stay, nothing is kept as a year */
 async function clearPractice(){
   if(A.past){toast("Past years are look only.");return}
+  /* Swim Opt 2.30 (problem 28): with Supabase, one call on the server clears it all at once */
+  let done=null;
+  if(A.store.clearPractice){
+    toast("Clearing...",120000);
+    const runId=newRunId();
+    try{done=await A.store.clearPractice(runId)}
+    catch(e){toast(e&&e.code==="offline"?"Not cleared. Check the connection and try again.":"Not cleared. Calling Tech Boy to help you. Enjoy grandstand duty next year.");return}
+    if(done!=null){A.cfg=Object.assign({},A.cfg,{locked:false,lockedAt:null,runId,notSwum:[]});toast("Practice data cleared")}
+  }
+  if(done==null){
   const jobs=[];
   for(const h of A.heats){const id=h._id||rid(h.race);jobs.push("heats/"+id,"times/"+id,"finish/"+id,"slips/"+id,"photos/"+id)}
   for(const id of Object.keys(A.times))jobs.push("times/"+id);
   for(const id of Object.keys(A.finish))jobs.push("finish/"+id);
   for(const id of Object.keys(A.slips))jobs.push("slips/"+id,"photos/"+id);
   for(const e of A.extras)jobs.push("extras/"+e.id);
-  toast("Clearing...");
+  toast("Clearing...",120000);
   for(const p of new Set(jobs)){try{await A.store.del(p)}catch(e){}}
   await w0(()=>A.store.set("counter/race",{next:1,at:Date.now()}));
   await saveCfg({locked:false,lockedAt:null,runId:newRunId(),notSwum:[]},"Practice data cleared");
+  }
   A.heats=[];A.times={};A.finish={};A.slips={};A.extras=[];A.counter=1;A.s.mtov={};mtSave();
   A.o.newMsg="Practice data cleared. Race number back to 1. Students, settings and records are kept.";
   A.modal=null;recompute();render();
@@ -201,7 +212,8 @@ async function clearPractice(){
 async function downloadBackup(){
   toast("Making the backup...");
   const photos={};
-  for(const id of Object.keys(A.slips)){try{const ph=await A.store.get("photos/"+id);if(ph&&ph.img)photos[id]=ph.img}catch(e){}}
+  /* Swim Opt 2.30: a multitimer race has no photo, so none is asked for (13 console errors in the half-day run) */
+  for(const id of Object.keys(A.slips)){if(A.slips[id]&&A.slips[id].multi)continue;try{const ph=await A.store.get("photos/"+id);if(ph&&ph.img)photos[id]=ph.img}catch(e){}}
   const strip=o=>JSON.parse(JSON.stringify(o));
   const b={app:"CCAS Swimming Carnival",kind:"full backup",version:"Swim Opt 2.7",savedAt:localStamp(),year:curYear(),
     config:strip(A.cfg),roster:{F:strip(A.roster.F),M:strip(A.roster.M)},extras:strip(A.extras),heats:strip(A.heats),times:strip(A.times),
@@ -264,7 +276,7 @@ async function newCarnival(bring){
   const a2=a1&&await w0(()=>A.store.set("archive/"+yr+"-roster",{F:strip(A.roster.F),M:strip(A.roster.M),extras:strip(A.extras)}));
   const a3=a2&&await w0(()=>A.store.set("archive/"+yr+"-data",{heats:strip(A.heats),times:strip(A.times),finish:strip(A.finish),slips:strip(A.slips),counter:A.counter}));
   if(!a3){A.modal=null;toast("The "+yr+" carnival could not be kept, so nothing was cleared. Try again.");render();return}
-  for(const id of Object.keys(A.slips)){try{const ph=await A.store.get("photos/"+id);if(ph)await A.store.set("photos/y"+yr+"-"+id,ph)}catch(e){}}
+  for(const id of Object.keys(A.slips)){if(A.slips[id]&&A.slips[id].multi)continue;try{const ph=await A.store.get("photos/"+id);if(ph)await A.store.set("photos/y"+yr+"-"+id,ph)}catch(e){}}
   await w0(()=>A.store.set("years/"+yr,{year:yr,name:A.cfg.name,date:A.cfg.date,archivedAt:Date.now(),heats:A.heats.length,students:students().length}));
   const ids=A.heats.map(h=>h._id||rid(h.race));
   const jobs=[];

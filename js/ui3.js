@@ -186,14 +186,17 @@ function renderSlips(){
   const top=waiting?`<div class="msg warn">No signal. ${plural(waiting,"photo")} waiting to send. It sends by itself when there is signal.</div>`:"";
   if(!r)return `<div class="phone">${top}${waitingCard("Waiting for the marshal","Race 1 appears here once it is sent.")}</div>`;
   if(mtWanted(r))return renderMulti(r,top);
-  const done=r.hasSlip;const t=slipMode();
+  /* Swim Opt 2.30 (decision 194, problem 8): a race the Recorder has typed in full needs no photo, so after
+     refused photos the phone is not stuck on Take again: it shows the sent layout with Next race */
+  const byRec=!r.hasSlip&&r.nTimes>0&&(r.allIn||r.checked);
+  const done=r.hasSlip||byRec;const t=slipMode();
   if(realReader()&&innerWidth<700)slipOcrLoad().catch(()=>{});
-  const showNext=done&&!A.s.err&&!A.s.flash;
+  const showNext=done&&(!A.s.err||byRec)&&!A.s.flash;
   const hasNext=nextRaceAfter(r.race)!=null;
   return `${lockBar()}<div class="phone">${top}
     <div class="row" style="flex-wrap:nowrap">${badge(r.race,"xl")}<div style="min-width:0"><b style="font:800 1.15rem var(--font-display);display:block">${esc(r.label)}</b><span class="muted">Heat ${r.heat}</span></div></div>
-    ${A.s.err?`<div class="msg bad" role="alert">${A.s.err}</div>`:""}
-    ${showNext?`<div class="msg ${slipWaiting(r.race)?"warn":"ok"}">${slipWaiting(r.race)?`Race ${r.race} slip saved on this phone. It sends by itself when there is signal.`:r.slip.multi?`Race ${r.race} multitimer times sent to the Recorder.`:`Race ${r.race} slip read and sent to the Recorder.`}</div>
+    ${A.s.err&&!showNext?`<div class="msg bad" role="alert">${A.s.err}</div>`:""}
+    ${showNext?`<div class="msg ${slipWaiting(r.race)?"warn":"ok"}">${byRec?`Race ${r.race} times are in from the Recorder. No photo needed.`:slipWaiting(r.race)?`Race ${r.race} slip saved on this phone. It sends by itself when there is signal.`:r.slip.multi?`Race ${r.race} multitimer times sent to the Recorder.`:`Race ${r.race} slip read and sent to the Recorder.`}</div>
        ${hasNext?`<button type="button" class="btn navy big" data-act="snext" style="width:100%">Next race</button>`:`<button type="button" class="btn big" disabled style="width:100%">Waiting for marshal</button>`}
        <label class="btn" for="camin" style="width:100%">Replace this slip with a new photo</label>`
      :A.s.reading||A.s.sending?`<div class="cam" role="status">${A.s.sending?"Sending the slip...":"Reading the slip..."}</div>`
@@ -291,8 +294,9 @@ async function sendSlip(key,img,meta,lanes){
   const r1=await w(()=>A.store.set("photos/"+key,{img,at:Date.now()}));
   const r2=await w(()=>A.store.set("slips/"+key,meta));
   let cur=null;try{cur=await withTimeout(A.store.get("times/"+key),4000)}catch(e){cur=A.times[key]||null}
-  const doc=lateSlip(cur,{lanes,src:"photo",checked:false,gen:meta.gen||0,by:DEV,at:Date.now()});
-  const r3=await w(()=>A.store.set("times/"+key,doc));
+  const raw={lanes,src:"photo",checked:false,gen:meta.gen||0,by:DEV,at:Date.now()};
+  const doc=lateSlip(cur,raw);
+  const r3=await w(()=>A.store.set("times/"+key,doc,{raw}));
   return [r1,r2,r3].some(x=>!x||x.queued);
 }
 MODALS.pickLane=M=>{const r=A.R.races.get(M.race);if(!r)return `<p>Race not found.</p><div class="acts"><button type="button" class="btn" data-act="closemodal">Close</button></div>`;
@@ -438,8 +442,8 @@ async function mtSend(force){
   setTimeout(()=>{A.s.flash=null;render()},1100);
   await w(()=>A.store.set("slips/"+key,meta));
   let cur=null;try{cur=await withTimeout(A.store.get("times/"+key),4000)}catch(e){cur=A.times[key]||null}
-  const merged=lateSlip(cur,tdoc());
-  await w(()=>A.store.set("times/"+key,merged));
+  const raw=tdoc(),merged=lateSlip(cur,raw);
+  await w(()=>A.store.set("times/"+key,merged,{raw}));
   await w(()=>A.store.set("finish/"+key,mkFin(merged)));
 }
 /* Fix splits: delete a double tap, add a missed time, or clear and time again */

@@ -43,8 +43,17 @@ async function supabaseStore(onQueue){
     await signIn();
     const [t,id]=split(w.path);
     if(t==="photos")return photoWrite(w,id);
-    let r;
-    if(w.op==="set")r=await sb.from(t).upsert({id,doc:w.data,updated_at:new Date().toISOString()});
+    let r,doc=w.data;
+    /* Swim Opt 2.30 (problem 27): a slip or multitimer send is merged with the server's copy as it goes, not
+       with the copy the phone had when Send was pressed (it may be minutes old after no signal), so a time
+       the Recorder typed in the meantime stays and the slip time shows beside it ("Slip differs").
+       The server does the same again (times_slip_merge in supabase/01-setup.sql). */
+    if(w.op==="set"&&w.raw&&t==="times"&&typeof lateSlip==="function"){
+      const c=await sb.from(t).select("doc").eq("id",id).maybeSingle();
+      if(c.error)throw err(c.error);
+      doc=lateSlip(c.data?c.data.doc:null,w.raw);
+    }
+    if(w.op==="set")r=await sb.from(t).upsert({id,doc,updated_at:new Date().toISOString()});
     else if(w.op==="update")r=await sb.rpc("doc_update",{tbl:t,doc_id:id,patch:w.data});
     else r=await sb.from(t).delete().eq("id",id);
     if(r.error)throw err(r.error);
@@ -88,10 +97,18 @@ async function supabaseStore(onQueue){
     for(const w of pendingFor(path))applyOp(m,id,w);
     fire(t,id);
   }
-  async function send(w){
+  /* Swim Opt 2.30 (problem 6): saves of one record go one after another, in the order they were made.
+     Before, four fast Place Judge taps were four saves on the road at once, and a slower earlier one
+     (3 places) could land after the last one (4 places) and wipe the 4th place. */
+  const chains=new Map();
+  function send(w){
     local(w);inflight.set(w.path,(inflight.get(w.path)||0)+1);
-    try{return await queue.run(w)}
-    finally{const n=inflight.get(w.path)-1;if(n>0)inflight.set(w.path,n);else{inflight.delete(w.path);reread(w.path).catch(()=>{})}}
+    const prev=chains.get(w.path)||Promise.resolve();
+    const p=prev.catch(()=>{}).then(()=>queue.run(w)).finally(()=>{
+      if(chains.get(w.path)===p)chains.delete(w.path);
+      const n=inflight.get(w.path)-1;if(n>0)inflight.set(w.path,n);else{inflight.delete(w.path);reread(w.path).catch(()=>{})}});
+    chains.set(w.path,p);
+    return p;
   }
   function local(w){
     const [t,id]=split(w.path);if(t==="photos")return;
@@ -110,15 +127,51 @@ async function supabaseStore(onQueue){
   /* one private channel, "carnival": row changes plus presence. Only a device with a job can join. */
   let ch=null,myPres={},peersCb=[],role=null;
   const emitPeers=list=>peersCb.forEach(cb=>cb(list));
-  async function join(){
-    if(ch){try{await sb.removeChannel(ch)}catch(e){}ch=null}
-    if(!role){emitPeers([]);return}
-    try{await sb.realtime.setAuth()}catch(e){}
-    ch=sb.channel("carnival",{config:{private:true,presence:{key:DEV}}});
-    for(const t of SB_TABLES)ch.on("postgres_changes",{event:"*",schema:"public",table:t},onChange);
-    ch.on("presence",{event:"sync"},()=>{const st=ch.presenceState();emitPeers(Object.values(st).flat().map(p=>{const o=Object.assign({},p);delete o.presence_ref;return o}))});
-    ch.subscribe(st=>{if(st==="SUBSCRIBED"){ch.track(Object.assign({dev:DEV},myPres)).catch(()=>{});loadAll()}});
+  /* Swim Opt 2.30 (problem 26): Supabase closes the channel of a device that sends more than 5 presence
+     updates in 30 seconds ("Client presence rate limit exceeded"). The Recorder sent one for every race it
+     opened, so its channel was closed about every second race and live updates stopped.
+     Now: an update that changes nothing is not sent, at most 4 go in any 30 seconds (a later one waits and
+     only the newest is sent), and a closed channel is joined again by itself, then every table is read again
+     so nothing missed while it was closed is lost. "up" says whether live updates are on. */
+  const PRES_MAX=4,PRES_WIN=30000;let presAt=[],presSent="",presTimer=null,up=false;
+  function track(){
+    if(!ch||!up)return;
+    const body=Object.assign({dev:DEV},myPres),key=JSON.stringify(body);
+    if(key===presSent)return;
+    const now=Date.now();presAt=presAt.filter(t=>now-t<PRES_WIN);
+    if(presAt.length>=PRES_MAX){if(!presTimer)presTimer=setTimeout(()=>{presTimer=null;track()},PRES_WIN-(now-presAt[0])+50);return}
+    presAt.push(now);presSent=key;ch.track(body).catch(()=>{presSent=""});
   }
+  let rejoinT=null,tries=0;
+  const setUp=v=>{if(up!==v){up=v;try{onQueue&&onQueue()}catch(e){}}};
+  function rejoinSoon(){
+    if(rejoinT||!role)return;
+    const wait=Math.min(30000,1000*Math.pow(2,tries++));
+    rejoinT=setTimeout(()=>{rejoinT=null;join()},wait);
+  }
+  async function join(){
+    clearTimeout(rejoinT);rejoinT=null;
+    const old=ch;ch=null;setUp(false);
+    if(old){try{await sb.removeChannel(old)}catch(e){}}
+    /* the library hands back a channel of the same name if one is still listed, so none may be left */
+    for(const c of sb.getChannels())if(c.topic==="realtime:carnival"){try{await sb.removeChannel(c)}catch(e){}try{c.teardown();sb.realtime._remove(c)}catch(e){}}
+    if(!role){emitPeers([]);return}
+    if(ch)return; /* another join started while this one waited */
+    try{await sb.realtime.setAuth()}catch(e){}
+    if(ch)return;
+    const me=sb.channel("carnival",{config:{private:true,presence:{key:DEV}}});ch=me;
+    for(const t of SB_TABLES)me.on("postgres_changes",{event:"*",schema:"public",table:t},onChange);
+    me.on("presence",{event:"sync"},()=>{const st=me.presenceState();emitPeers(Object.values(st).flat().map(p=>{const o=Object.assign({},p);delete o.presence_ref;return o}))});
+    try{me.subscribe(st=>{
+      if(me!==ch)return;
+      if(st==="SUBSCRIBED"){tries=0;setUp(true);presSent="";track();loadAll()}
+      else if(st==="CLOSED"||st==="CHANNEL_ERROR"||st==="TIMED_OUT"){setUp(false);rejoinSoon()}
+    })}catch(e){rejoinSoon()}
+  }
+  /* back from no signal, or the page shown again: join at once if live updates are off */
+  const wake=()=>{if(role&&!up){tries=0;clearTimeout(rejoinT);rejoinT=null;join()}};
+  window.addEventListener("online",wake);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)wake()});
 
   await signIn();
   try{const r=await sb.rpc("my_role");role=r.error?null:r.data||null}catch(e){}
@@ -138,7 +191,8 @@ async function supabaseStore(onQueue){
       if(r.error)throw err(r.error);
       return r.data?r.data.doc:null;
     },
-    set(path,data){return send({op:"set",path,data})},
+    /* opt.raw: the slip's own times, merged with the server's copy when the save goes (see write) */
+    set(path,data,opt){const w={op:"set",path,data};if(opt&&opt.raw)w.raw=opt.raw;return send(w)},
     update(path,data){return send({op:"update",path,data})},
     del(path){return send({op:"del",path})},
     async nextRace(){
@@ -147,7 +201,9 @@ async function supabaseStore(onQueue){
       if(r.error)throw err(r.error).code==="offline"?{code:"offline"}:{code:"busy"};
       return r.data;
     },
-    presence(obj){myPres=Object.assign(myPres,obj);if(ch){ch.track(Object.assign({dev:DEV},myPres)).catch(()=>{})}},
+    presence(obj){myPres=Object.assign(myPres,obj);track()},
+    /* Swim Opt 2.30: false while the live channel is closed and being joined again */
+    get live(){return !role||up},
     onPeers(cb){peersCb.push(cb)},
     hasRoom:true,
     pending:()=>queue.size(),queued:pre=>queue.count(pre),flush:()=>queue.flush(),
@@ -160,6 +216,21 @@ async function supabaseStore(onQueue){
       return role;
     },
     async releaseRole(){role=null;await join();try{await sb.rpc("release_role")}catch(e){}},
+    /* Swim Opt 2.30 (problem 28): Clear practice data in one server call, then this carnival's slip photos
+       (r0001.jpg and so on; a kept year's photos, y2027-..., stay). Photos left by a page closed too soon are
+       found and removed by the next clear, as the whole folder is listed, not this device's copy. */
+    async clearPractice(runId){
+      await signIn();
+      const r=await sb.rpc("clear_practice",{run_id:String(runId||"")});
+      /* the 2.30 01-setup.sql not run yet: the page clears record by record, as before */
+      if(r.error&&String(r.error.code||"")==="PGRST202")return null;
+      if(r.error)throw err(r.error);
+      const B=sb.storage.from("slips");const names=[];
+      for(let off=0;off<20000;off+=1000){const l=await B.list("",{limit:1000,offset:off});if(l.error||!l.data)break;
+        for(const f of l.data)if(/^r\d+\.jpg$/.test(f.name))names.push(f.name);if(l.data.length<1000)break}
+      for(let i=0;i<names.length;i+=100){const d=await B.remove(names.slice(i,i+100));if(d.error)break}
+      return r.data;
+    },
     async setYear(y){const r=await sb.rpc("set_year",{y:String(y||"current")});if(r.error)throw err(r.error)},
     async checkPin(job,hash){const r=await sb.rpc("check_pin",{job,pin_hash:hash});if(r.error)throw err(r.error);return !!r.data}
   };
