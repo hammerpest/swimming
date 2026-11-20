@@ -129,6 +129,15 @@ async def main():
         check(n == 3 and rp and rp[-1][1]["run_id"] == "run9" and not await p.evaluate("Object.keys(MOCK.db.heats).length"),
               "clear: one server call clears the races")
         check(sorted(await p.evaluate("MOCK.removed")) == ["r0001.jpg", "r0002.jpg"], "clear: this carnival's photos removed, a kept year's photo stays")
+        # Swim Opt 2.31: the second carnival's race numbers and clear go to its own records and photos only
+        await p.evaluate("MOCK.rpcs=[];MOCK.files=['r0005.jpg','b_r0001.jpg','b_y2027-r0001.jpg'];MOCK.removed=[]")
+        await p.evaluate("S.nextRace('b_').catch(()=>0)"); await p.evaluate("S.nextRace().catch(()=>0)")
+        nr = await p.evaluate("MOCK.rpcs.filter(r=>r[0]==='next_race').map(r=>r[1])")
+        check(len(nr) == 2 and nr[0].get("carn") == "b_" and "carn" not in nr[1], "2.31: next_race names the second carnival; the first carnival's call is as before")
+        await p.evaluate("S.clearPractice('run10','b_')")
+        rp = await p.evaluate("MOCK.rpcs.filter(r=>r[0]==='clear_practice').map(r=>r[1])")
+        check(rp and rp[-1].get("carn") == "b_" and await p.evaluate("MOCK.removed") == ["b_r0001.jpg"],
+              "2.31: clearing the second carnival removes only its photos")
         check(not errs, "no page errors " + "; ".join(errs[:3]))
         await b.close()
 

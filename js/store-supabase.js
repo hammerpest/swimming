@@ -195,9 +195,10 @@ async function supabaseStore(onQueue){
     set(path,data,opt){const w={op:"set",path,data};if(opt&&opt.raw)w.raw=opt.raw;return send(w)},
     update(path,data){return send({op:"update",path,data})},
     del(path){return send({op:"del",path})},
-    async nextRace(){
+    /* Swim Opt 2.31: carn "b_" numbers the second carnival's races (the first carnival's call is unchanged) */
+    async nextRace(carn){
       await signIn();
-      let r;try{r=await withTimeout(sb.rpc("next_race",{dev:DEV}),6000)}catch(e){throw {code:"offline"}}
+      let r;try{r=await withTimeout(sb.rpc("next_race",carn?{dev:DEV,carn}:{dev:DEV}),6000)}catch(e){throw {code:"offline"}}
       if(r.error)throw err(r.error).code==="offline"?{code:"offline"}:{code:"busy"};
       return r.data;
     },
@@ -219,18 +220,20 @@ async function supabaseStore(onQueue){
     /* Swim Opt 2.30 (problem 28): Clear practice data in one server call, then this carnival's slip photos
        (r0001.jpg and so on; a kept year's photos, y2027-..., stay). Photos left by a page closed too soon are
        found and removed by the next clear, as the whole folder is listed, not this device's copy. */
-    async clearPractice(runId){
+    async clearPractice(runId,carn){
       await signIn();
-      const r=await sb.rpc("clear_practice",{run_id:String(runId||"")});
+      const r=await sb.rpc("clear_practice",carn?{run_id:String(runId||""),carn}:{run_id:String(runId||"")});
       /* the 2.30 01-setup.sql not run yet: the page clears record by record, as before */
       if(r.error&&String(r.error.code||"")==="PGRST202")return null;
       if(r.error)throw err(r.error);
       const B=sb.storage.from("slips");const names=[];
       for(let off=0;off<20000;off+=1000){const l=await B.list("",{limit:1000,offset:off});if(l.error||!l.data)break;
-        for(const f of l.data)if(/^r\d+\.jpg$/.test(f.name))names.push(f.name);if(l.data.length<1000)break}
+        for(const f of l.data)if((carn?/^b_r\d+\.jpg$/:/^r\d+\.jpg$/).test(f.name))names.push(f.name);if(l.data.length<1000)break}
       for(let i=0;i<names.length;i+=100){const d=await B.remove(names.slice(i,i+100));if(d.error)break}
       return r.data;
     },
+    /* Swim Opt 2.31: false until the 2.31 supabase/01-setup.sql has been run on the project */
+    async carnivalsReady(){await signIn();const r=await sb.rpc("running_key");return !(r.error&&String(r.error.code||"")==="PGRST202")},
     async setYear(y){const r=await sb.rpc("set_year",{y:String(y||"current")});if(r.error)throw err(r.error)},
     async checkPin(job,hash){const r=await sb.rpc("check_pin",{job,pin_hash:hash});if(r.error)throw err(r.error);return !!r.data}
   };

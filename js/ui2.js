@@ -323,5 +323,5 @@ MODALS.goRace=M=>{
 };
 function slipTick(){return `<span class="sliptick"><span class="tk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Slip added</span>`}
 function waitingCard(t,s){return `<div class="panel stack" style="max-width:640px;margin:30px auto;text-align:center;align-items:center">${badge(null,"xl")}<h2>${esc(t)}</h2><p class="muted" style="margin:0">${esc(s)}</p></div>`}
-function lockBar(){if(A.past)return `<div class="lockbar">You are looking at the ${esc(A.past)} carnival. Look only: nothing can be changed. Use Change year to go back to ${esc(curYear())}.</div>`;return locked()?`<div class="lockbar">Results are locked. You can look, but nothing can be changed until the organiser unlocks them.</div>`:""}
+function lockBar(){if(A.past)return `<div class="lockbar">You are looking at the ${esc(hdrTitle())} carnival. Look only: nothing can be changed. Use Change carnival to go back to ${esc(curYear()+(twoCarnivals()?" "+levelName(A.L.cfg||A.cfg):""))}.</div>`;return locked()?`<div class="lockbar">Results are locked. You can look, but nothing can be changed until the organiser unlocks them.</div>`:""}
 

@@ -341,6 +341,55 @@ admin.execute("update private.sessions set year = '2026' where role = 'org'")
 check(not o.ok("select clear_practice('run2')"), "2.30: no clearing while a past year is open")
 admin.execute("update private.sessions set year = null where role = 'org'")
 
+# Swim Opt 2.31 (decisions 197 to 199): two carnivals in one year; only the running one takes job writes
+for t_ in ("heats", "times", "finish", "slips", "extras"): admin.execute(f"delete from {t_}")
+admin.execute("delete from storage.objects")
+m = Dev(); m.q("select claim_role('aaaa1111')")  # the Marshal PIN was changed above
+r = Dev(); r.pin("recorder"); s = Dev(); s.pin("slips")
+check(m.q("select running_key()")[0][0] == "" and x.q("select running_key()")[0][0] is None, "2.31: running key is the first carnival; no job gets nothing")
+check(m.ok("insert into heats values ('r0100', '{\"race\":100}')") and not m.ok("insert into heats values ('b_r0001', '{\"race\":1}')"),
+      "2.31: the Marshal writes to the running carnival only")
+check(o.ok("insert into config values ('b_main', %s) on conflict (id) do update set doc = excluded.doc", (_json.dumps({"name": "Primary", "level": "primary", "pins": {"marshal": "zzzz"}}),)),
+      "2.31: the organiser adds the second carnival")
+check("pins" not in admin.execute("select doc from config where id='b_main'").fetchone()[0] and Dev().q("select claim_role('zzzz')")[0][0] is None,
+      "2.31: the second carnival cannot hold or change PINs (198)")
+check(not m.ok("insert into config values ('running', '{\"key\":\"b_\"}')"), "2.31: only the organiser picks the running carnival")
+check(o.ok("insert into config values ('running', '{\"key\":\"b_\"}') on conflict (id) do update set doc = excluded.doc"), "2.31: the organiser makes the second carnival run")
+check(m.q("select running_key()")[0][0] == "b_", "2.31: jobs see the new running carnival")
+check(m.ok("insert into heats values ('b_r0001', '{\"race\":1}')") and not m.ok("insert into heats values ('r0101', '{\"race\":101}')"),
+      "2.31: now the Marshal writes to the second carnival only")
+check([m.q("select next_race('m', 'b_')")[0][0] for _ in range(2)] == [1, 2] and not m.ok("select next_race('m')"),
+      "2.31: the second carnival has its own race numbers; the first takes none from a job")
+check(o.q("select next_race('o')")[0][0] >= 1, "2.31: the organiser can still number the first carnival")
+check(r.ok("select doc_update('heats', 'b_r0001', '{\"lanes\":{\"1\":\"t001\"}}')") and not r.ok("select doc_update('heats', 'r0100', '{\"lanes\":{\"1\":\"t001\"}}')"),
+      "2.31: the Recorder fills lanes on the running carnival only")
+check(r.ok("select doc_update('times', 'b_r0001', '{\"lanes\":{}}')") and not r.ok("select doc_update('times', 'r0100', '{\"lanes\":{}}')"),
+      "2.31: the Recorder types times on the running carnival only")
+check(s.ok("insert into storage.objects (bucket_id, name) values ('slips', 'b_r0001.jpg')") and not s.ok("insert into storage.objects (bucket_id, name) values ('slips', 'r0100.jpg')"),
+      "2.31: slip photos go to the running carnival only")
+admin.execute("update config set doc = doc || '{\"locked\":true}' where id = 'b_main'")
+check(not m.ok("insert into heats values ('b_r0003', '{}')") and not m.ok("select next_race('m', 'b_')"), "2.31: locking the second carnival stops its jobs")
+admin.execute("update config set doc = doc || '{\"locked\":false}' where id = 'b_main'")
+admin.execute("""insert into times values ('r0100', '{"lanes":{}}') on conflict (id) do nothing""")
+check(o.q("select clear_practice('run3', 'b_')")[0][0] == 1, "2.31: Clear practice data clears the second carnival")
+check(admin.execute("select count(*) from heats where id like 'b\\_%'").fetchone()[0] == 0
+      and admin.execute("select count(*) from heats where id = 'r0100'").fetchone()[0] == 1
+      and admin.execute("select count(*) from times where id = 'r0100'").fetchone()[0] == 1
+      and admin.execute("select doc->>'next' from counter where id='b_race'").fetchone()[0] == "1"
+      and admin.execute("select doc->>'runId' from config where id='b_main'").fetchone()[0] == "run3"
+      and admin.execute("select doc->>'runId' from config where id='main'").fetchone()[0] == "run1",
+      "2.31: the first carnival is not touched by clearing the second")
+# parents page shows the running carnival, with plain ids
+admin.execute("update config set doc = doc || '{\"parents\": true}' where id = 'b_main'")
+H("b_r0007", {"race": 7, "k": "free50", "x": "F", "g": "8", "heat": 1, "lanes": {"4": st["id"]}})
+T("b_r0007", {"lanes": {"4": {"t": 4000, "st": "ok"}}}); F("b_r0007", {"order": [[4]], "ok": True})
+d = pr()
+check(not d.get("off") and [h["_id"] for h in d["heats"]] == ["r0007"] and "r0007" in d["times"] and d["config"]["name"] == "Primary",
+      "2.31: the parents page shows only the running carnival")
+admin.execute("update config set doc = doc || '{\"parents\": false}' where id = 'b_main'")
+check(o.ok("insert into config values ('running', '{\"key\":\"\"}') on conflict (id) do update set doc = excluded.doc")
+      and m.ok("insert into heats values ('r0102', '{}')"), "2.31: back to the first carnival")
+
 srv.cleanup()
 print(f"\n{len(fails)} failed" if fails else "\nall passed")
 sys.exit(1 if fails else 0)

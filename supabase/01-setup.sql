@@ -70,15 +70,34 @@ language sql stable security definer set search_path = '' as $$
   select coalesce((select (doc->>'locked')::boolean from public.config where id = 'main'), false)
 $$;
 
+-- Swim Opt 2.31 (decisions 197 and 199): one year can hold two carnivals (Secondary and Primary).
+-- The first carnival's ids are as before (main, race, r0001, F, M); the second carnival's start with 'b_'
+-- (b_main, b_race, b_r0001, b_F). Kept years: 2027 and b_2027. Photos: r0001.jpg and b_r0001.jpg.
+-- Only one carnival runs at a time: config 'running' holds its key ('' or 'b_'). Every job PIN works on the
+-- running carnival only; the organiser can set up either one.
+create or replace function private.carn_of(row_id text) returns text
+language sql immutable set search_path = '' as $$
+  select case when coalesce(row_id, '') like 'b\_%' then 'b_' else '' end
+$$;
+create or replace function private.running_key() returns text
+language sql stable security definer set search_path = '' as $$
+  select case when (select doc->>'key' from public.config where id = 'running') = 'b_' then 'b_' else '' end
+$$;
+create or replace function private.locked_for(carn text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select (doc->>'locked')::boolean from public.config where id = coalesce(carn, '') || 'main'), false)
+$$;
+
 -- Who can write each collection. The organiser writes everything (but not while a past year is open).
--- When results are locked, only the organiser can write.
-create or replace function private.can_write(tbl text) returns boolean
+-- When results are locked, only the organiser can write. Swim Opt 2.31: a job writes only to the running
+-- carnival (row_id says which carnival a row belongs to).
+create or replace function private.can_write_row(tbl text, row_id text) returns boolean
 language plpgsql stable security definer set search_path = '' as $$
-declare r text := private.my_role();
+declare r text := private.my_role(); k text := private.carn_of(row_id);
 begin
   if r is null or private.in_past() then return false; end if;
   if r = 'org' then return true; end if;
-  if private.is_locked() then return false; end if;
+  if k <> private.running_key() or private.locked_for(k) then return false; end if;
   return case tbl
     when 'heats'  then r = 'marshal'
     when 'extras' then r = 'marshal'
@@ -89,6 +108,10 @@ begin
     else false
   end;
 end $$;
+create or replace function private.can_write(tbl text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select private.can_write_row(tbl, '')
+$$;
 
 -- Deep merge, the same as the page's update() in test mode.
 create or replace function private.jsonb_merge(a jsonb, b jsonb) returns jsonb
@@ -105,7 +128,8 @@ $$;
 grant usage on schema private to authenticated;
 revoke all on all functions in schema private from public, anon;
 grant execute on function private.my_role(), private.in_past(), private.is_locked(),
-  private.can_write(text), private.jsonb_merge(jsonb, jsonb) to authenticated;
+  private.can_write(text), private.jsonb_merge(jsonb, jsonb), private.carn_of(text), private.running_key(),
+  private.locked_for(text), private.can_write_row(text, text) to authenticated;
 
 -- Swim Opt 2.11: every saved document gets the server's clock as updated_at, never the phone's.
 -- The parent page uses the newest updated_at to tell whether anything changed.
@@ -135,9 +159,9 @@ begin
     execute format('drop policy if exists "job can change" on public.%I', t);
     execute format('drop policy if exists "job can delete" on public.%I', t);
     execute format('create policy "job can read" on public.%I for select to authenticated using (private.my_role() is not null)', t);
-    execute format('create policy "job can add" on public.%I for insert to authenticated with check (private.can_write(%L))', t, t);
-    execute format('create policy "job can change" on public.%I for update to authenticated using (private.can_write(%L)) with check (private.can_write(%L))', t, t, t);
-    execute format('create policy "job can delete" on public.%I for delete to authenticated using (private.can_write(%L))', t, t);
+    execute format('create policy "job can add" on public.%I for insert to authenticated with check (private.can_write_row(%L, id))', t, t);
+    execute format('create policy "job can change" on public.%I for update to authenticated using (private.can_write_row(%L, id)) with check (private.can_write_row(%L, id))', t, t, t);
+    execute format('create policy "job can delete" on public.%I for delete to authenticated using (private.can_write_row(%L, id))', t, t);
   end loop;
 end $$;
 
@@ -145,7 +169,8 @@ end $$;
 -- (the heat row must exist), and not when results are locked or a past year is open.
 create or replace function private.recorder_heat(row_id text) returns boolean
 language sql stable security definer set search_path = '' as $$
-  select private.my_role() = 'recorder' and not private.in_past() and not private.is_locked()
+  select private.my_role() = 'recorder' and not private.in_past()
+    and private.carn_of(row_id) = private.running_key() and not private.locked_for(private.carn_of(row_id))
     and exists (select 1 from public.heats h where h.id = row_id)
 $$;
 revoke all on function private.recorder_heat(text) from public, anon;
@@ -153,17 +178,17 @@ grant execute on function private.recorder_heat(text) to authenticated;
 drop policy if exists "job can add" on public.heats;
 drop policy if exists "job can change" on public.heats;
 create policy "job can add" on public.heats for insert to authenticated
-  with check (private.can_write('heats') or private.recorder_heat(id));
+  with check (private.can_write_row('heats', id) or private.recorder_heat(id));
 create policy "job can change" on public.heats for update to authenticated
-  using (private.can_write('heats') or private.recorder_heat(id))
-  with check (private.can_write('heats') or private.recorder_heat(id));
+  using (private.can_write_row('heats', id) or private.recorder_heat(id))
+  with check (private.can_write_row('heats', id) or private.recorder_heat(id));
 -- The Recorder may change only the lanes (and the time of the change), nothing else in a race.
 -- Swim Opt 2.7 (A1, decisions 134 and 135): the Recorder may also cancel a race sent in error
 -- (cancelled, cancelAt) and clear it for a re-swim (gen).
 create or replace function private.heats_recorder_lanes_only() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
-  if not private.can_write('heats') and private.my_role() = 'recorder'
+  if not private.can_write_row('heats', new.id) and private.my_role() = 'recorder'
      and (new.doc - 'lanes' - 'edited' - 'cancelled' - 'cancelAt' - 'gen')
          is distinct from (old.doc - 'lanes' - 'edited' - 'cancelled' - 'cancelAt' - 'gen') then
     raise exception 'The Recorder can only change lanes' using errcode = '42501';
@@ -318,7 +343,11 @@ create or replace function private.config_pins() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare k text; v text; marks jsonb;
 begin
-  if new.id <> 'main' then return new; end if;
+  -- Swim Opt 2.31 (decision 198): both carnivals use the same six PINs, kept with the first carnival (main)
+  if new.id <> 'main' then
+    if jsonb_typeof(new.doc) = 'object' then new.doc := new.doc - 'pins'; end if;
+    return new;
+  end if;
   if jsonb_typeof(new.doc->'pins') = 'object' then
     for k, v in select key, value #>> '{}' from jsonb_each(new.doc->'pins') loop
       if v is not null and v <> 'set' then
@@ -341,19 +370,22 @@ create trigger config_pins before insert or update on public.config
 -- ---------- race numbers (decisions 40 and 42) ----------
 -- One sequence all day. The row lock makes two marshals pressing at once wait in turn,
 -- so numbers come out in arrival order with no gaps or repeats.
-create or replace function public.next_race(dev text) returns integer
+-- Swim Opt 2.31: each carnival has its own race numbers (counter race and b_race).
+drop function if exists public.next_race(text);
+create or replace function public.next_race(dev text, carn text default '') returns integer
 language plpgsql volatile security definer set search_path = '' as $$
-declare n integer; r text := private.my_role();
+declare n integer; r text := private.my_role(); k text := private.carn_of(carn);
 begin
-  if r is null or r not in ('marshal', 'org') or private.in_past() or (r <> 'org' and private.is_locked()) then
+  if r is null or r not in ('marshal', 'org') or private.in_past()
+     or (r <> 'org' and (private.locked_for(k) or k <> private.running_key())) then
     raise exception 'This job cannot send heats' using errcode = '42501';
   end if;
-  insert into public.counter (id, doc) values ('race', '{"next":1}') on conflict (id) do nothing;
-  select coalesce((doc->>'next')::integer, 1) into n from public.counter where id = 'race' for update;
+  insert into public.counter (id, doc) values (k || 'race', '{"next":1}') on conflict (id) do nothing;
+  select coalesce((doc->>'next')::integer, 1) into n from public.counter where id = k || 'race' for update;
   update public.counter
     set doc = jsonb_build_object('next', n + 1, 'by', dev, 'at', floor(extract(epoch from now()) * 1000)::bigint),
         updated_at = now()
-    where id = 'race';
+    where id = k || 'race';
   return n;
 end $$;
 
@@ -377,35 +409,43 @@ end $$;
 -- open. The slip photos are then removed by the page (Supabase only lets the Storage API delete files).
 -- Only the Carnival Organiser, and not while a past year is open. "where true": Supabase refuses a
 -- delete with no where.
-create or replace function public.clear_practice(run_id text) returns integer
+-- Swim Opt 2.31: clears one carnival only (carn '' or 'b_'); the other carnival is not touched.
+drop function if exists public.clear_practice(text);
+create or replace function public.clear_practice(run_id text, carn text default '') returns integer
 language plpgsql volatile security definer set search_path = '' as $$
-declare n integer;
+declare n integer; k text := private.carn_of(carn);
 begin
   if private.my_role() is distinct from 'org' or private.in_past() then
     raise exception 'Only the Carnival Organiser can clear practice data' using errcode = '42501';
   end if;
-  select count(*) into n from public.heats;
-  delete from public.heats where true;
-  delete from public.times where true;
-  delete from public.finish where true;
-  delete from public.slips where true;
-  delete from public.extras where true;
-  insert into public.counter (id, doc) values ('race', '{"next":1}') on conflict (id) do nothing;
+  select count(*) into n from public.heats where private.carn_of(id) = k;
+  delete from public.heats where private.carn_of(id) = k;
+  delete from public.times where private.carn_of(id) = k;
+  delete from public.finish where private.carn_of(id) = k;
+  delete from public.slips where private.carn_of(id) = k;
+  delete from public.extras where private.carn_of(id) = k;
+  insert into public.counter (id, doc) values (k || 'race', '{"next":1}') on conflict (id) do nothing;
   update public.counter
     set doc = jsonb_build_object('next', 1, 'at', floor(extract(epoch from now()) * 1000)::bigint)
-    where id = 'race';
+    where id = k || 'race';
   update public.config
     set doc = doc || jsonb_build_object('locked', false, 'lockedAt', null, 'runId', coalesce(run_id, ''), 'notSwum', '[]'::jsonb)
-    where id = 'main';
+    where id = k || 'main';
   return n;
 end $$;
 
+-- Swim Opt 2.31: the key of the running carnival. The page also uses it to tell whether this file has been run.
+create or replace function public.running_key() returns text
+language sql stable security definer set search_path = '' as $$
+  select case when private.my_role() is null then null else private.running_key() end
+$$;
+
 revoke all on function public.claim_role(text), public.my_role(), public.release_role(), public.set_year(text),
-  public.check_pin(text, text), public.next_race(text), public.doc_update(text, text, jsonb),
-  public.clear_practice(text) from public, anon;
+  public.check_pin(text, text), public.next_race(text, text), public.doc_update(text, text, jsonb),
+  public.clear_practice(text, text), public.running_key() from public, anon;
 grant execute on function public.claim_role(text), public.my_role(), public.release_role(), public.set_year(text),
-  public.check_pin(text, text), public.next_race(text), public.doc_update(text, text, jsonb),
-  public.clear_practice(text) to authenticated;
+  public.check_pin(text, text), public.next_race(text, text), public.doc_update(text, text, jsonb),
+  public.clear_practice(text, text), public.running_key() to authenticated;
 
 -- ---------- slip photos: private bucket "slips" ----------
 insert into storage.buckets (id, name, public) values ('slips', 'slips', false) on conflict (id) do nothing;
@@ -416,11 +456,11 @@ drop policy if exists "slips photos delete" on storage.objects;
 create policy "slips photos read" on storage.objects for select to authenticated
   using (bucket_id = 'slips' and private.my_role() is not null);
 create policy "slips photos add" on storage.objects for insert to authenticated
-  with check (bucket_id = 'slips' and private.can_write('photos'));
+  with check (bucket_id = 'slips' and private.can_write_row('photos', name));
 create policy "slips photos change" on storage.objects for update to authenticated
-  using (bucket_id = 'slips' and private.can_write('photos')) with check (bucket_id = 'slips' and private.can_write('photos'));
+  using (bucket_id = 'slips' and private.can_write_row('photos', name)) with check (bucket_id = 'slips' and private.can_write_row('photos', name));
 create policy "slips photos delete" on storage.objects for delete to authenticated
-  using (bucket_id = 'slips' and private.can_write('photos'));
+  using (bucket_id = 'slips' and private.can_write_row('photos', name));
 
 -- ---------- live updates and presence ----------
 -- Row changes reach a device only if it can read the row (row-level security above).

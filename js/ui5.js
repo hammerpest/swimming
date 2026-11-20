@@ -40,7 +40,7 @@ OSEC.parents=()=>{const p=parentsCfg();const dis=A.past?"disabled":"";
   <div class="msg info">Never sent to parents: PINs, device names, slip photos, dates of birth and student ids.</div>`};
 function progList(){return (A.cfg.program||DEFAULT_CONFIG.program).filter(p=>TYPE[p.k])}
 OSEC.details=()=>{const c=A.cfg;
-  return `<h2>Carnival details</h2><div class="fields">
+  return `<h2>Carnival details</h2>${runningBox()}<div class="fields">
     <label style="grid-column:1/-1">Carnival name<input id="cName" value="${esc(c.name)}"></label>
     <label>Date<input id="cDate" type="date" value="${esc(c.date)}"></label>
     <label style="justify-content:flex-end"><span class="row" style="gap:8px;color:var(--ink);min-height:48px"><input type="checkbox" id="cDateOk" ${c.dateConfirmed?"checked":""} style="width:22px;height:22px"> Date confirmed</span></label>
@@ -51,7 +51,7 @@ OSEC.details=()=>{const c=A.cfg;
   </div><div><button type="button" class="btn primary" data-act="osavedetails">Save details</button></div>
   <hr style="border:0;border-top:1px solid var(--line);width:100%">
   <h3>PINs</h3><p class="muted" style="margin:0">Each job has its own PIN and opens only that job. The Announcer PIN also opens Results and Houses. The Carnival Organiser PIN opens every job. Every PIN must be different.</p>
-  <div class="tablewrap"><table><thead><tr><th>Job</th><th>PIN now</th><th>New PIN</th></tr></thead><tbody>${PIN_ROLES.map(([k,n,d])=>{const changed=c.pins&&c.pins[k]&&c.pins[k]!==DEFAULT_PINS[k];return `<tr><td><b>${esc(n)}</b></td><td>${changed?`<span class="chip final">Changed</span>`:`<span class="chip prov">Test PIN ${d}</span>`}</td><td><span class="row" style="gap:6px;flex-wrap:nowrap"><input id="pin-${k}" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="New PIN for ${esc(n)}" style="width:7em"><button type="button" class="btn small" data-act="opin" data-v="${k}">Change</button></span></td></tr>`}).join("")}</tbody></table></div>
+  <div class="tablewrap"><table><thead><tr><th>Job</th><th>PIN now</th><th>New PIN</th></tr></thead><tbody>${PIN_ROLES.map(([k,n,d])=>{const cp=(carnCfg("")||c).pins;const changed=cp&&cp[k]&&cp[k]!==DEFAULT_PINS[k];return `<tr><td><b>${esc(n)}</b></td><td>${changed?`<span class="chip final">Changed</span>`:`<span class="chip prov">Test PIN ${d}</span>`}</td><td><span class="row" style="gap:6px;flex-wrap:nowrap"><input id="pin-${k}" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="New PIN for ${esc(n)}" style="width:7em"><button type="button" class="btn small" data-act="opin" data-v="${k}">Change</button></span></td></tr>`}).join("")}</tbody></table></div>
   <hr style="border:0;border-top:1px solid var(--line);width:100%">
   <div class="row">${badge(A.counter)}<span class="muted">Next race number. It only goes back to 1 with Start a new carnival.</span></div>
   <div class="row"><input id="cNext" inputmode="numeric" autocomplete="off" aria-label="New next race number" style="width:7em"><button type="button" class="btn small" data-act="onext">Set next race number</button><span class="muted" style="font-size:.88rem">Forward only, to match the timing console.</span></div>`};
@@ -163,7 +163,7 @@ OSEC.lock=()=>`<h2>Lock and new carnival</h2>
    <div><button type="button" class="btn danger" data-act="oclear">Clear practice data</button></div></div>
   ${A.o.newMsg?`<div class="msg ok">${esc(A.o.newMsg)}</div>`:""}`;
 MODALS.newCarnival=M=>M.step===1?`<h2>Start a new carnival</h2>
-  <div><b>Kept as the ${esc((A.cfg.date||"2027").slice(0,4))} carnival (look only):</b> all ${students().length} students, ${A.heats.length} heats with their places, times and slip photos, results and records. Open it any time from Change year.</div>
+  <div><b>Kept as the ${esc((A.cfg.date||"2027").slice(0,4))} carnival (look only):</b> all ${students().length} students, ${A.heats.length} heats with their places, times and slip photos, results and records. Open it any time from Change carnival.</div>
   <div><b>Then the new ${+((A.cfg.date||"2027").slice(0,4))+1} carnival starts empty:</b> no students or heats, race number back to 1. Carnival details, PINs, program, points, odd-time limits and records carry over.</div>
   <label class="stack" style="gap:4px;font-weight:600">Type the organiser PIN<input id="ncPin" inputmode="numeric" maxlength="4" autocomplete="off" style="width:8em"></label>
   ${M.err?`<div class="msg bad">${esc(M.err)}</div>`:""}
@@ -265,19 +265,20 @@ async function saveCfg(patch,msg){
 }
 async function w0(fn){if(A.past){toast("Past years are look only.");return null}try{const r=await fn();if(r&&r.queued)toast("Saved on this device. Sends when there is signal.");return r||{ok:true}}catch(e){toast("Not saved. Calling Tech Boy to help you. Enjoy grandstand duty next year.");return null}}
 async function newCarnival(bring){
-  const yr=(A.cfg.date||"2027").slice(0,4);
+  const yr=carnYear(A.carn);const K=A.carn;
   let recs=A.records.slice();
   if(bring){for(const G of A.R.broken.filter(G=>G.final)){const holders=G.recordNote.rows.map(r=>({n:pname(r.p),h:r.p.h,y:yr}));
     const old=G.recordNote.old;recs=recs.filter(x=>x.key!==G.key);recs.push({key:G.key,t:G.recordNote.rows[0].eff,holders:G.recordNote.kind==="equal"?[...(old.holders||[]),...holders]:holders})}}
   /* keep the whole year first (decision 95) */
   toast("Keeping the "+yr+" carnival...");
   const strip=o=>JSON.parse(JSON.stringify(o));
-  const a1=await w0(()=>A.store.set("archive/"+yr+"-config",{cfg:strip(A.cfg),records:strip(A.records)}));
-  const a2=a1&&await w0(()=>A.store.set("archive/"+yr+"-roster",{F:strip(A.roster.F),M:strip(A.roster.M),extras:strip(A.extras)}));
-  const a3=a2&&await w0(()=>A.store.set("archive/"+yr+"-data",{heats:strip(A.heats),times:strip(A.times),finish:strip(A.finish),slips:strip(A.slips),counter:A.counter}));
+  /* Swim Opt 2.31: the second carnival is kept as b_2027 (archive b_2027-config and so on) */
+  const a1=await w0(()=>A.store.set("archive/"+K+yr+"-config",{cfg:strip(A.cfg),records:strip(A.records)}));
+  const a2=a1&&await w0(()=>A.store.set("archive/"+K+yr+"-roster",{F:strip(A.roster.F),M:strip(A.roster.M),extras:strip(A.extras)}));
+  const a3=a2&&await w0(()=>A.store.set("archive/"+K+yr+"-data",{heats:strip(A.heats),times:strip(A.times),finish:strip(A.finish),slips:strip(A.slips),counter:A.counter}));
   if(!a3){A.modal=null;toast("The "+yr+" carnival could not be kept, so nothing was cleared. Try again.");render();return}
   for(const id of Object.keys(A.slips)){if(A.slips[id]&&A.slips[id].multi)continue;try{const ph=await A.store.get("photos/"+id);if(ph)await A.store.set("photos/y"+yr+"-"+id,ph)}catch(e){}}
-  await w0(()=>A.store.set("years/"+yr,{year:yr,name:A.cfg.name,date:A.cfg.date,archivedAt:Date.now(),heats:A.heats.length,students:students().length}));
+  await w0(()=>A.store.set("years/"+K+yr,Object.assign({year:yr,name:A.cfg.name,date:A.cfg.date,archivedAt:Date.now(),heats:A.heats.length,students:students().length},twoCarnivals()||K?{key:K,level:carnLevel(A.cfg)}:{})));
   const ids=A.heats.map(h=>h._id||rid(h.race));
   const jobs=[];
   for(const id of ids){jobs.push("heats/"+id,"times/"+id,"finish/"+id,"slips/"+id,"photos/"+id)}
@@ -294,7 +295,7 @@ async function newCarnival(bring){
   const ny=String(+yr+1);
   await A.store.set("config/main",Object.assign({},A.cfg,{runId:newRunId(),notSwum:[],locked:false,lockedAt:null,date:ny+(A.cfg.date||"2027-02-10").slice(4),dateConfirmed:false,ageDate:yr+"-12-31",name:String(A.cfg.name||"").includes(yr)?A.cfg.name.replace(yr,ny):A.cfg.name}));
   A.heats=[];A.times={};A.finish={};A.slips={};A.extras=[];A.roster={F:[],M:[]};A.records=recs;A.counter=1;A.s.mtov={};mtSave();
-  A.o.newMsg="The "+yr+" carnival is kept (look only, open it from Change year). The "+ny+" carnival is ready. Race number back to 1. Load the new student list in section 2 and check the date in section 1.";
+  A.o.newMsg="The "+yr+" carnival is kept (look only, open it from Change carnival). The "+ny+" carnival is ready. Race number back to 1. Load the new student list in section 2 and check the date in section 1.";
   A.modal=null;recompute();render();
 }
 function parseRecordRows(text){
@@ -323,6 +324,8 @@ function render(){
 }
 function renderInner(){
   if(!A.R)recompute();
+  /* Swim Opt 2.31: a job PIN follows the running carnival; the organiser gets the morning question */
+  checkCarn();morningCheck();
   if(A.role==="org"&&!A.yearPicked)A.job=null;
   if(A.role&&A.role!=="org"&&(!A.job||!canOpen(A.job))){A.job=homeJob();ssSet("swim_job",A.job)}
   if(A.role==="org"&&A.job&&!canOpen(A.job==="organiser"?"org":A.job))A.job=null;
@@ -385,7 +388,7 @@ function wireInputs(){
     fr.readAsText(file)};
   const of=document.getElementById("oFile");if(of)of.onchange=e=>{const file=e.target.files[0];if(!file)return;const fr=new FileReader();fr.onload=()=>{A.o.text=String(fr.result);A.o.preview=parseStudents(A.o.text,A.cfg.ageDate,carnLevel(A.cfg));render()};fr.readAsText(file)};
 }
-const ACT={
+const ACT={...CARN_ACT,
   key:el=>pressKey(el.dataset.k),
   menu:()=>{A.menu=!A.menu;renderHeader()},
   goto:el=>goJob(el.dataset.job),
@@ -470,7 +473,8 @@ const ACT={
   csv:()=>exportCsv(),
   newscopy:async()=>{const ta=document.getElementById("newsText");try{await navigator.clipboard.writeText(ta.value);toast("Article copied")}catch(e){ta.focus();ta.select();toast("Press Ctrl+C or Cmd+C to copy")}},
   osec:el=>{A.o.sec=el.dataset.v;render()},
-  year:el=>enterYear(el.dataset.v),
+  /* Swim Opt 2.31: a card for the other carnival (or the running one, from the other) loads the page on it */
+  year:el=>{const v=el.dataset.v;if(v==="current"&&A.carn!==A.running){openCarn(A.running);return}if(/^carn/.test(v)){openCarn(v==="carna"?"":v.slice(4));return}enterYear(v)},
   changeyear:()=>{A.yearPicked=null;ssSet("swim_year",null);A.job=null;A.menu=false;render()},
   olanes:el=>{const b=document.getElementById("cLanes");b.textContent=Math.max(4,Math.min(10,(+b.textContent)+(+el.dataset.d)))},
   osavedetails:()=>saveCfg({name:document.getElementById("cName").value.trim()||A.cfg.name,date:document.getElementById("cDate").value,dateConfirmed:document.getElementById("cDateOk").checked,ageDate:document.getElementById("cAge").value||"2026-12-31",pool:document.getElementById("cPool").value.trim(),poolLen:document.getElementById("cLen").value,lanes:+document.getElementById("cLanes").textContent},"Details saved"),
@@ -479,6 +483,8 @@ const ACT={
     const h=pinHash(p);const P=pins();const clash=PIN_ROLES.find(([k])=>k!==v&&P[k]===h);
     if(clash){toast("That PIN is already used for "+clash[1]+". Pick a different one.");return}
     const name=PIN_ROLES.find(x=>x[0]===v)[1];
+    /* Swim Opt 2.31 (decision 198): both carnivals share the PINs, kept with the first carnival */
+    if(A.carn){const m=carnCfg("")||{};const np=Object.assign({},m.pins||{},{[v]:h});w0(()=>A.store.raw.update("config/main",{pins:np})).then(r=>{if(r){A.carns[""]=Object.assign({},m,{pins:np});toast(name+" PIN changed");render()}});return}
     saveCfg({pins:Object.assign({},A.cfg.pins||{},{[v]:h})},name+" PIN changed")},
   ocheck:()=>{const ta=document.getElementById("oText");A.o.text=ta.value;A.o.preview=parseStudents(A.o.text,A.cfg.ageDate,carnLevel(A.cfg));render()},
   otest:()=>{A.o.preview={ok:TEST_STUDENTS(carnLevel(A.cfg)),bad:[]};A.o.text="";render()},
@@ -487,6 +493,8 @@ const ACT={
     if(r2){A.roster={F,M};A.o.preview=null;A.o.text="";recompute();toast(ok.length+" students imported");render()}},
   omove:el=>{const p=progList().map(x=>Object.assign({},x));const i=+el.dataset.i,j=i+(+el.dataset.d);[p[i],p[j]]=[p[j],p[i]];saveCfg({program:p},"Program order saved")},
   olevel:el=>{const v=el.dataset.v;if(agesFixed()||carnLevel(A.cfg)===v)return;
+    /* Swim Opt 2.31: the two carnivals of a year are one Secondary and one Primary */
+    const ot=carnCfg(otherKey(A.carn));if(ot&&carnLevel(ot)===v){toast(carnYear(otherKey(A.carn))+" "+LEVELS[v].name+" already has its own carnival. Pick it on Which carnival.");return}
     saveCfg({level:v},LEVELS[v].name+" carnival saved"+(students().length?". Import the student list again.":""))},
   oage:el=>{if(agesFixed())return;const lv=carnLevel(A.cfg);const off=new Set(((A.cfg.agesOff||{})[lv])||[]);const a=el.dataset.v;
     if(off.has(a))off.delete(a);else{if(levelAgesOn(A.cfg).length<=1){toast("Keep at least one age on.");return}off.add(a)}

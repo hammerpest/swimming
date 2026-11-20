@@ -288,9 +288,9 @@ body:has(.pbar) .toast{bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 
 /* ===== Swim Opt 2.24 (design S1.46 version 4, decisions 178 to 183): the onlinecarnivals.au landing look on the
    PIN, Which carnival and Choose your job screens (html.homes, set in renderHeader). Every job screen keeps the look above. ===== */
-:root{--lt-bg:#f3f5fb;--lt-ink:#14203f;--lt-muted:#4a5573;--lt-line:rgba(20,32,63,.5);--lt-y:#8a6c00;--lt-glow:rgba(255,201,7,.16)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--lt-bg:#0b1226;--lt-ink:#ffffff;--lt-muted:#b9c2de;--lt-line:rgba(255,255,255,.4);--lt-y:#ffc907;--lt-glow:rgba(255,201,7,.08)}}
-:root[data-theme="dark"]{--lt-bg:#0b1226;--lt-ink:#ffffff;--lt-muted:#b9c2de;--lt-line:rgba(255,255,255,.4);--lt-y:#ffc907;--lt-glow:rgba(255,201,7,.08)}
+:root{--lt-bg:#f3f5fb;--lt-ink:#14203f;--lt-muted:#4a5573;--lt-line:rgba(20,32,63,.5);--lt-y:#8a6c00;--lt-glow:rgba(255,201,7,.16);--lt-card:rgba(255,201,7,.16)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--lt-bg:#0b1226;--lt-ink:#ffffff;--lt-muted:#b9c2de;--lt-line:rgba(255,255,255,.4);--lt-y:#ffc907;--lt-glow:rgba(255,201,7,.08);--lt-card:rgba(255,201,7,.13)}}
+:root[data-theme="dark"]{--lt-bg:#0b1226;--lt-ink:#ffffff;--lt-muted:#b9c2de;--lt-line:rgba(255,255,255,.4);--lt-y:#ffc907;--lt-glow:rgba(255,201,7,.08);--lt-card:rgba(255,201,7,.13)}
 html.homes body{background:var(--lt-bg)}
 html.homes body::before{background:var(--lt-bg)}
 /* ticker (decorative, hidden from screen readers; still under reduced motion) */
@@ -332,7 +332,14 @@ html.homes .tile .row{grid-column:1/-1}
 html.homes .tile .row b{font:900 clamp(22px,3vw,32px)/1 var(--font-display)}
 html.homes .tile .row ~ span{grid-column:1/-1}
 /* Which carnival: a yellow oval around the year being opened (decision 179) */
-html.homes .tile[data-v=current] .row b{display:inline-block;padding:2px 18px 4px;border:3px solid var(--lt-y);border-radius:999px;color:var(--lt-ink)}
+/* Swim Opt 2.31 (S1.49 version 3, decision 197): each carnival card is a clear button: fill and a 3 px outline, always on; navy under the mouse */
+html.homes .stack.carns{gap:14px}
+html.homes .stack.carns .tile{background:var(--lt-card);border:3px solid var(--lt-ink);border-radius:14px}
+html.homes .stack.carns .tile.carn .row b{color:var(--lt-ink)}
+@media (hover:hover){html.homes .stack.carns .tile:hover{background:#1d3160;color:#fff;border-color:#1d3160}
+  html.homes .stack.carns .tile:hover>span:not(.row){color:#b9c3da}html.homes .stack.carns .tile:hover .row b{color:#fff}}
+html.homes .stack.carns .tile:focus-visible{background:#1d3160;color:#fff;border-color:#1d3160}
+html.homes .stack.carns .tile:focus-visible>span:not(.row){color:#b9c3da}html.homes .stack.carns .tile:focus-visible .row b{color:#fff}
 /* Choose your job on a Mac (mouse or trackpad only, not under reduced motion): the landing page's lane effects (decision 179).
    .fx is on the tiles only the first time the screen shows, so a refresh does not replay the slide in. */
 @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){

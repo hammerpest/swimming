@@ -55,8 +55,10 @@ $$;
 create or replace function public.parent_results(have text default '') returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare cfg jsonb; v text; ids jsonb; salt text; names_on boolean; prov boolean; open_races jsonb;
+  -- Swim Opt 2.31 (decision 197): the page shows the running carnival only; its ids lose the 'b_' mark
+  ckey text := private.running_key();
 begin
-  select doc into cfg from public.config where id = 'main';
+  select doc into cfg from public.config where id = ckey || 'main';
   if cfg is null or coalesce(cfg->'parents', 'false'::jsonb) <> 'true'::jsonb then
     return jsonb_build_object('off', true);
   end if;
@@ -64,12 +66,12 @@ begin
   names_on := coalesce(cfg->>'parentsNames', 'none') = 'short';
   prov := coalesce(cfg->'parentsProv', 'false'::jsonb) = 'true'::jsonb;
   v := concat_ws('.',
-    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from public.heats),
-    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from public.times),
-    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from public.finish),
-    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from public.records),
-    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from public.roster),
-    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from public.extras),
+    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.heats z where private.carn_of(z.id) = ckey) q),
+    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.times z where private.carn_of(z.id) = ckey) q),
+    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.finish z where private.carn_of(z.id) = ckey) q),
+    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.records z where private.carn_of(z.id) = ckey) q),
+    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.roster z where private.carn_of(z.id) = ckey) q),
+    (select count(*) || '-' || coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.extras z where private.carn_of(z.id) = ckey) q),
     (select coalesce(floor(extract(epoch from max(updated_at)) * 1000)::bigint, 0) from public.config));
   if v = have then
     return jsonb_build_object('v', v, 'same', true);
@@ -77,7 +79,7 @@ begin
   select p.salt into salt from private.parent_secret p where p.id = 1;
   -- every swimmer in a heat gets a fixed code
   select coalesce(jsonb_object_agg(id, private.pcode(id, salt)), '{}'::jsonb) into ids from (
-    select distinct e.value as id from public.heats h,
+    select distinct e.value as id from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.heats z where private.carn_of(z.id) = ckey) h,
       jsonb_each_text(case when jsonb_typeof(h.doc->'lanes') = 'object' then h.doc->'lanes' else '{}'::jsonb end) e
     where coalesce(e.value, '') <> '') q;
 
@@ -88,7 +90,7 @@ begin
     select h.id, h.doc, private.jnum(h.doc->'gen') as gen,
       private.jtrue(h.doc->'cancelled') as cancelled,
       case when jsonb_typeof(h.doc->'lanes') = 'object' then h.doc->'lanes' else '{}'::jsonb end as lanes
-    from public.heats h where private.jtrue(h.doc->'race')),
+    from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.heats z where private.carn_of(z.id) = ckey) h where private.jtrue(h.doc->'race')),
   hd as (
     -- grouped like the app's groupKey: a missing value and null stay apart
     select hs.id, hs.doc->'k' as k, hs.doc->'x' as x, hs.doc->'g' as g, hs.cancelled,
@@ -106,7 +108,7 @@ begin
          or (jsonb_typeof(f.doc->'order') = 'array' and jsonb_array_length(f.doc->'order') > 0)
          or (jsonb_typeof(f.doc->'taps') = 'array' and jsonb_array_length(f.doc->'taps') > 0))) as places,
       (t.doc is not null and private.jnum(t.doc->'gen') = hs.gen and private.jtrue(t.doc->'checked')) as checked
-    from hs left join public.times t on t.id = hs.id left join public.finish f on f.id = hs.id),
+    from hs left join (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.times z where private.carn_of(z.id) = ckey) t on t.id = hs.id left join (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.finish z where private.carn_of(z.id) = ckey) f on f.id = hs.id),
   heat_in as (
     select id, k, x, g, cancelled, (n_in = filled and (places or checked or n_ok = 0)) as is_in from hd),
   open_ev as (
@@ -128,28 +130,28 @@ begin
         'lanes', coalesce((select jsonb_object_agg(e.key, private.pcode(e.value, salt))
           from jsonb_each_text(case when jsonb_typeof(h.doc->'lanes') = 'object' then h.doc->'lanes' else '{}'::jsonb end) e
           where coalesce(e.value, '') <> ''), '{}'::jsonb)))
-      from public.heats h), '[]'::jsonb),
+      from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.heats z where private.carn_of(z.id) = ckey) h), '[]'::jsonb),
     -- per lane only the time, its status and (for "Slip differs") the slip's time
     'times', coalesce((select jsonb_object_agg(t.id, jsonb_build_object('gen', t.doc->'gen', 'checked', t.doc->'checked',
         'checkedAt', t.doc->'checkedAt', 'at', t.doc->'at',
         'lanes', coalesce((select jsonb_object_agg(l.key, jsonb_build_object('t', l.value->'t', 'st', l.value->'st', 'slip', l.value->'slip'))
           from jsonb_each(case when jsonb_typeof(t.doc->'lanes') = 'object' then t.doc->'lanes' else '{}'::jsonb end) l), '{}'::jsonb)))
-      from public.times t where not (open_races ? t.id)), '{}'::jsonb),
+      from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.times z where private.carn_of(z.id) = ckey) t where not (open_races ? t.id)), '{}'::jsonb),
     'finish', coalesce((select jsonb_object_agg(f.id, jsonb_build_object('order', f.doc->'order', 'gen', f.doc->'gen',
       'ck', f.doc->'ck', 'ok', f.doc->'ok', 'at', f.doc->'at',
       -- Swim Opt 2.12: multitimer tap order (lane numbers only), so places follow DNS, DQ or No time marks
       'multi', f.doc->'multi', 'taps', f.doc->'taps', 'n', f.doc->'n'))
-      from public.finish f where not (open_races ? f.id)), '{}'::jsonb),
+      from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.finish z where private.carn_of(z.id) = ckey) f where not (open_races ? f.id)), '{}'::jsonb),
     'records', coalesce((select jsonb_agg(jsonb_build_object('key', r->'key', 't', r->'t',
         'holders', coalesce((select jsonb_agg(jsonb_build_object('n',
             case when names_on then private.initial_surname(regexp_replace(coalesce(hd->>'n', ''), '^Test: ', '')) else 'A swimmer' end,
           'h', hd->'h', 'y', hd->'y')) from jsonb_array_elements(case when jsonb_typeof(r->'holders') = 'array' then r->'holders' else '[]'::jsonb end) hd), '[]'::jsonb)))
-      from public.records rr, jsonb_array_elements(case when jsonb_typeof(rr.doc->'list') = 'array' then rr.doc->'list' else '[]'::jsonb end) r
+      from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.records z where private.carn_of(z.id) = ckey) rr, jsonb_array_elements(case when jsonb_typeof(rr.doc->'list') = 'array' then rr.doc->'list' else '[]'::jsonb end) r
       where rr.id = 'all'), '[]'::jsonb),
     'students', coalesce((
       with everyone as (
-        select s from public.roster r, jsonb_array_elements(case when jsonb_typeof(r.doc->'students') = 'array' then r.doc->'students' else '[]'::jsonb end) s
-        union all select x.doc from public.extras x),
+        select s from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.roster z where private.carn_of(z.id) = ckey) r, jsonb_array_elements(case when jsonb_typeof(r.doc->'students') = 'array' then r.doc->'students' else '[]'::jsonb end) s
+        union all select x.doc from (select substr(z.id, length(ckey) + 1) as id, z.doc, z.updated_at from public.extras z where private.carn_of(z.id) = ckey) x),
       -- Swim Opt 2.22 (decision 171): two swimmers with the same first initial and surname show two letters ("Le Bell", "Lu Bell")
       sent as (select s, count(*) over (partition by lower(left(btrim(coalesce(s->>'f', '')), 1)), lower(btrim(coalesce(s->>'s', '')))) as same
         from everyone where ids ? (s->>'id'))

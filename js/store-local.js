@@ -137,8 +137,9 @@ function localStore(onQueue){
     async set(path,data){put(path,JSON.parse(JSON.stringify(data)));return {ok:true}},
     async update(path,data){put(path,merge(mem[path],JSON.parse(JSON.stringify(data))));return {ok:true}},
     async del(path){put(path,null);return {ok:true}},
-    async nextRace(){
-      const run=async()=>{const d=mem["counter/race"]||{};const n=Number(d.next)||1;put("counter/race",{next:n+1,by:DEV,at:Date.now()});return n};
+    async nextRace(carn){
+      const c="counter/"+(carn||"")+"race";
+      const run=async()=>{const d=mem[c]||{};const n=Number(d.next)||1;put(c,{next:n+1,by:DEV,at:Date.now()});return n};
       const p=counterLock.then(run);counterLock=p.catch(()=>{});return p;
     },
     presence(obj){const pres=Object.assign({dev:DEV},peers.get(DEV)||{},obj);peers.set(DEV,pres);emitPeers();if(ch)ch.postMessage({pres})},

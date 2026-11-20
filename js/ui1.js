@@ -1,6 +1,6 @@
 /* ===== Swim Opt 1: app shell, PIN, header, shared helpers ===== */
 /* Swim Opt 2.15 (decision 157): the running version, shown in the Carnival Organiser badge. Update it with each release. */
-const APP_VERSION="2.30";
+const APP_VERSION="2.31";
 const JOBS=[
   {k:"marshal",n:1,name:"Marshal",badge:"MARSHAL",dev:"iPad",desc:"Put swimmers in lanes and send each heat"},
   {k:"judge",n:2,name:"Place Judge",badge:"PLACE JUDGE",dev:"iPad",desc:"Tap the top places in each heat"},
@@ -17,7 +17,9 @@ const A={
   j:{race:null,ann:null,mine:{}},r:{race:null,since:Date.now(),errs:{}},s:{race:null,test:null,flash:null,err:null},slipImg:{},
   a:{idx:null},res:{tab:"race",sex:"all",type:"all",age:"all"},o:{sec:"details",preview:null,text:""},
   menu:false,modal:null,renderPending:false,
-  past:null,years:[],L:{},yearPicked:ssGet("swim_year",null)
+  past:null,years:[],L:{},yearPicked:ssGet("swim_year",null),
+  /* Swim Opt 2.31: the carnival open on this device ("" or "b_"), the running one, and both carnivals' settings */
+  carn:"",running:"",runKnown:false,carns:{},morningAsked:false
 };
 function ssGet(k,d){try{const v=sessionStorage.getItem(k);return v==null?d:v}catch(e){return d}}
 function ssSet(k,v){try{if(v==null)sessionStorage.removeItem(k);else sessionStorage.setItem(k,v)}catch(e){}}
@@ -27,7 +29,7 @@ function pinHash(p){let h=2166136261;const s="ccas-swim:"+p;for(let i=0;i<s.leng
 /* One PIN per job (decision 88). The organiser PIN opens every job. */
 const PIN_ROLES=[["marshal","Marshal","1111"],["judge","Place Judge","2222"],["slips","Time Slips","4444"],["recorder","Recorder","3333"],["announcer","Announcer","5555"],["org","Carnival Organiser","9999"]];
 const DEFAULT_PINS=Object.fromEntries(PIN_ROLES.map(([k,,p])=>[k,pinHash(p)]));
-function pins(){const c=A.cfg.pins||{};return Object.fromEntries(PIN_ROLES.map(([k])=>[k,c[k]||DEFAULT_PINS[k]]))}
+function pins(){const c=(carnCfg("")||A.cfg).pins||{};return Object.fromEntries(PIN_ROLES.map(([k])=>[k,c[k]||DEFAULT_PINS[k]]))}
 function canOpen(k){if(A.role==="org")return true;if(!A.role)return false;if(k===A.role)return true;return A.role==="announcer"&&(k==="results"||k==="houses")}
 function homeJob(){return A.role==="announcer"?"announcer":A.role}
 if(!PIN_ROLES.some(x=>x[0]===A.role)){A.role=null;A.job=null}
@@ -80,7 +82,19 @@ async function connect(){
   try{if(typeof supabaseStore==="function")st=await supabaseStore(onQueue)}catch(e){}
   if(!st)try{st=await claudeStore(()=>renderHeader())}catch(e){}
   if(!st)st=localStore(()=>renderHeader());
+  /* Swim Opt 2.31: a job PIN works on the running carnival; the organiser on the one picked on Which carnival */
+  const base=st;
+  A.running=carnKey(lsGet("swim_running",""));
+  try{const d=await withTimeout(base.get("config/running"),4000);if(d||base.mode!=="supabase"||base.role){A.running=carnKey(d&&d.key);A.runKnown=true}}catch(e){}
+  const pick=ssGet("swim_carn",null);
+  A.carn=carnKey(A.role==="org"&&pick!=null?pick:A.running);
+  st=carnStore(base,A.carn);
   A.store=st;
+  base.onDoc("config/running",d=>{
+    if(base.mode==="supabase"&&!base.role&&!d)return;
+    A.running=carnKey(d&&d.key);A.runKnown=true;lsSet("swim_running",A.running);schedule();
+  });
+  for(const k of CARN_KEYS)base.onDoc("config/"+k+"main",d=>{A.carns[k]=d?Object.assign({},DEFAULT_CONFIG,d):null;schedule()});
   /* Supabase: the server decides the job; forget a job it does not know about */
   if(st.claimRole&&st.role!==A.role){A.role=null;A.job=null;A.yearPicked=null;ssSet("swim_role",null);ssSet("swim_job",null);ssSet("swim_year",null);render()}
   if(A.pin.length===4)pressKey("");
@@ -153,8 +167,8 @@ function renderHeader(){
   if(slim){h.innerHTML=`<div class="wrap"><div class="topin"><span class="live ${cls}"><i></i>${esc(live)}</span>${jobPill(jobs,esc(pillName()))}</div></div>`;return}
   h.innerHTML=`<div class="wrap"><div class="topin">
     ${j?`<span class="jobbadge">${esc(j.badge)}${j.k==="organiser"?`<small class="ver">v${APP_VERSION}</small>`:""}</span>`:""}
-    <div class="ttl"><b>Swimming Carnival ${A.past?esc(A.past):esc(curYear())}</b><small>${esc(A.cfg.name||"CCAS")}${A.job==="organiser"?" · Organiser PIN only":""}</small></div>
-    ${A.role==="org"&&A.yearPicked&&(!A.job||A.job==="organiser"||A.past)?`<button type="button" class="hlink" data-act="changeyear">${A.past?"Look only · ":""}Change year</button>`:""}
+    <div class="ttl"><b>Swimming Carnival ${esc(hdrTitle())}</b><small>${esc(A.cfg.name||"CCAS")}${A.job==="organiser"?" · Organiser PIN only":""}</small></div>
+    ${A.role==="org"&&A.yearPicked&&(!A.job||A.job==="organiser"||A.past)?`<button type="button" class="hlink" data-act="changeyear">${A.past?"Look only · ":""}Change carnival</button>`:""}
     ${links}
     <span class="live ${cls}"><i></i>${esc(live)}</span>
     ${j?jobPill(jobs,"Job: "+esc(pillName())):""}
@@ -208,13 +222,14 @@ function renderHome(){
     <div class="tiles${fx?" fx":""}">${tiles}${A.role==="org"?`<button type="button" class="tile orgtile wide" data-act="goto" data-job="organiser"><span class="n">6</span><b>Carnival Organiser</b><span>Organiser only</span></button>`:""}</div>
     <button type="button" class="linkbtn" data-act="signout">Sign out (back to PIN)</button></div>`;
 }
+/* Swim Opt 2.31 (S1.49 version 3): one card per carnival, then the kept years; each card is a clear button */
 function renderYearPick(){
-  const cur=curYear();
-  return `<div class="home"><h1>Which <span class="y">carnival?</span></h1><p class="muted" style="margin:0">Pick the year. Past years are look only.</p>
-    <div class="stack" style="width:100%;max-width:520px">
-      <button type="button" class="tile wide" style="min-height:0" data-act="year" data-v="current"><span class="row" style="justify-content:space-between;width:100%"><b>${esc(cur)}</b><span class="chip final">Current carnival</span></span><span>${esc(A.L.cfg?A.L.cfg.name:A.cfg.name)} · live</span></button>
-      ${A.years.filter(y=>String(y.year)!==cur).map(y=>`<button type="button" class="tile wide" style="min-height:0" data-act="year" data-v="${esc(y.year)}"><span class="row" style="justify-content:space-between;width:100%"><b>${esc(y.year)}</b><span class="chip">Look only</span></span><span>${esc(y.name||"")} · ${y.heats||0} races, ${y.students||0} students</span></button>`).join("")||`<p class="muted" style="margin:0">No past years kept yet. A year is kept when the organiser presses Start a new carnival.</p>`}
+  const C=carnCards();
+  return `<div class="home"><h1>Which <span class="y">carnival?</span></h1><p class="muted" style="margin:0">Pick the carnival. Past years are look only.</p>
+    <div class="stack carns" style="width:100%;max-width:520px">
+      ${C.cards}
     </div>
+    ${C.add}
     <button type="button" class="linkbtn" data-act="signout">Sign out (back to PIN)</button></div>`;
 }
 async function enterYear(y){
@@ -269,7 +284,7 @@ function goJob(k){
   if(k==="recorder")A.r.since=Date.now();
   announce();render();window.scrollTo(0,0);
 }
-function signOut(){if(A.past)enterYear("current");clearReadLists();if(A.store&&A.store.releaseRole)A.store.releaseRole().catch(()=>{});A.yearPicked=null;ssSet("swim_year",null);A.role=null;A.job=null;ssSet("swim_role",null);ssSet("swim_job",null);A.menu=false;A.m.phase="start";if(A.s.mtov){A.s.mtov={};mtSave()}announce();render()}
+function signOut(){if(A.past)enterYear("current");A.morningAsked=false;ssSet("swim_carn",null);clearReadLists();if(A.store&&A.store.releaseRole)A.store.releaseRole().catch(()=>{});A.yearPicked=null;ssSet("swim_year",null);A.role=null;A.job=null;ssSet("swim_role",null);ssSet("swim_job",null);A.menu=false;A.m.phase="start";if(A.s.mtov){A.s.mtov={};mtSave()}announce();render()}
 
 /* ---------- modal ---------- */
 function modalHtml(){
@@ -277,6 +292,6 @@ function modalHtml(){
   const f=MODALS[M.t];if(!f)return "";
   return `<div class="modalbg" data-act="modalbg"><div class="modal" role="dialog" aria-modal="true">${f(M)}</div></div>`;
 }
-const MODALS={};
+const MODALS=Object.assign({},CARN_MODALS);
 MODALS.leaveMarshal=M=>`<h2>Leave without sending?</h2><p style="margin:0">This heat has swimmers in lanes but has not been sent to the starter. If you leave now, the lanes are cleared.</p><div class="acts"><button type="button" class="btn" data-act="closemodal">&lt; Back to lanes</button><button type="button" class="btn danger" data-act="leaveok">Leave and clear</button></div>`;
 MODALS.info=M=>`<h2>${esc(M.title)}</h2>${M.body}<div class="acts"><button type="button" class="btn primary" data-act="closemodal">${esc(M.ok||"OK")}</button></div>`;

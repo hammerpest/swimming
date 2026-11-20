@@ -150,7 +150,7 @@ MODALS.slip=M=>`<h2>Slip photo: Race ${M.race}</h2>${M.img?`<img src="${M.img}" 
 async function viewSlip(race){
   const key=rid(race);const meta=(A.R.races.get(race)||{}).slip||{};
   A.modal={t:"slip",race,loading:true,read:meta.read||null};render();
-  try{const d=await A.store.get("photos/"+(A.past?"y"+A.past+"-":"")+key);if(A.modal&&A.modal.t==="slip"){A.modal.img=d&&d.img;A.modal.loading=false;render()}}catch(e){if(A.modal){A.modal.loading=false;render()}}
+  try{const d=await photoGet(key);if(A.modal&&A.modal.t==="slip"){A.modal.img=d&&d.img;A.modal.loading=false;render()}}catch(e){if(A.modal){A.modal.loading=false;render()}}
 }
 
 /* the slip photo under Race overall, so times, result and slip are on one screen */
@@ -160,7 +160,7 @@ function slipPanel(r){
   if(meta.multi)return `<div class="panel stack"><h3>Multitimer</h3><p class="muted" style="margin:0">Timed on the phone multitimer: no slip photo. Splits in finish order:</p>${mtSplitList(meta.splits||[])}</div>`;
   const ck=key+"@"+(meta.at||0);
   if(!(ck in A.slipImg)){A.slipImg={[ck]:null};
-    A.store.get("photos/"+(A.past?"y"+A.past+"-":"")+key).then(d=>{if(ck in A.slipImg){A.slipImg[ck]=(d&&d.img)||"";render()}}).catch(()=>{if(ck in A.slipImg){A.slipImg[ck]="";render()}})}
+    photoGet(key).then(d=>{if(ck in A.slipImg){A.slipImg[ck]=(d&&d.img)||"";render()}}).catch(()=>{if(ck in A.slipImg){A.slipImg[ck]="";render()}})}
   const c=A.slipImg[ck];const un=(meta.unsure||[]).filter(l=>meta.read&&meta.read[l]!=null);
   return `<div class="panel stack"><div class="row" style="justify-content:space-between"><h3>Time slip</h3><span class="row" style="gap:6px">${un.length?`<span class="chip prov">Hard to read: lane ${un.join(", ")}</span>`:""}${meta.two?`<span class="chip prov">May show more than one slip: check the photo</span>`:meta.mism?`<span class="chip prov">Lanes do not match marshalling: check the photo</span>`:meta.miss?`<span class="chip prov">Some lines not read: check the photo</span>`:""}</span></div>
     ${c?`<img src="${c}" alt="Time slip photo for race ${r.race}" style="display:block;width:100%;border-radius:10px;border:1px solid var(--line)">`:`<p class="muted" style="margin:0">${c===""?"No photo stored for this race.":"Loading the photo..."}</p>`}</div>`;
