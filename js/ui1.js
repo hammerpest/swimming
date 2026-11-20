@@ -168,7 +168,7 @@ function renderHeader(){
   h.innerHTML=`<div class="wrap"><div class="topin">
     ${j?`<span class="jobbadge">${esc(j.badge)}${j.k==="organiser"?`<small class="ver">v${APP_VERSION}</small>`:""}</span>`:""}
     <div class="ttl"><b>Swimming Carnival ${esc(hdrTitle())}</b><small>${esc(A.cfg.name||"CCAS")}${A.job==="organiser"?" · Organiser PIN only":""}</small></div>
-    ${A.role==="org"&&A.yearPicked&&(!A.job||A.job==="organiser"||A.past)?`<button type="button" class="hlink" data-act="changeyear">${A.past?"Look only · ":""}Change carnival</button>`:""}
+    ${A.role==="org"&&A.yearPicked&&(!A.job||A.job==="organiser"||A.past)?`<button type="button" class="hlink" data-act="changeyear">${A.past?"Look only · ":""}${chgLabel()}</button>`:""}
     ${links}
     <span class="live ${cls}"><i></i>${esc(live)}</span>
     ${j?jobPill(jobs,"Job: "+esc(pillName())):""}

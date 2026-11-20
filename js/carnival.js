@@ -47,6 +47,8 @@ function carnCfg(k){return (A.carns&&A.carns[k])||(k===""?(A.carn===""?A.L.cfg||
 function twoCarnivals(){return !!(carnCfg("")&&carnCfg("b_"))}
 function otherKey(k){return k==="b_"?"":"b_"}
 function carnYear(k){const c=carnCfg(k)||{};const m=carnCfg("")||{};return String(c.date||m.date||A.cfg.date||"2027").slice(0,4)}
+/* "Change carnival" only when a year has two carnivals; with one, the header keeps "Change year" (and its line breaks) */
+function chgLabel(){return twoCarnivals()?"Change carnival":"Change year"}
 function levelName(c){return LEVELS[carnLevel(c)].name}
 function carnLabel(k){return carnYear(k)+" "+levelName(carnCfg(k)||A.cfg)}
 function todayIso(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}

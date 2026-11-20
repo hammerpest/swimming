@@ -163,7 +163,7 @@ OSEC.lock=()=>`<h2>Lock and new carnival</h2>
    <div><button type="button" class="btn danger" data-act="oclear">Clear practice data</button></div></div>
   ${A.o.newMsg?`<div class="msg ok">${esc(A.o.newMsg)}</div>`:""}`;
 MODALS.newCarnival=M=>M.step===1?`<h2>Start a new carnival</h2>
-  <div><b>Kept as the ${esc((A.cfg.date||"2027").slice(0,4))} carnival (look only):</b> all ${students().length} students, ${A.heats.length} heats with their places, times and slip photos, results and records. Open it any time from Change carnival.</div>
+  <div><b>Kept as the ${esc((A.cfg.date||"2027").slice(0,4))} carnival (look only):</b> all ${students().length} students, ${A.heats.length} heats with their places, times and slip photos, results and records. Open it any time from ${chgLabel()}.</div>
   <div><b>Then the new ${+((A.cfg.date||"2027").slice(0,4))+1} carnival starts empty:</b> no students or heats, race number back to 1. Carnival details, PINs, program, points, odd-time limits and records carry over.</div>
   <label class="stack" style="gap:4px;font-weight:600">Type the organiser PIN<input id="ncPin" inputmode="numeric" maxlength="4" autocomplete="off" style="width:8em"></label>
   ${M.err?`<div class="msg bad">${esc(M.err)}</div>`:""}
@@ -295,7 +295,7 @@ async function newCarnival(bring){
   const ny=String(+yr+1);
   await A.store.set("config/main",Object.assign({},A.cfg,{runId:newRunId(),notSwum:[],locked:false,lockedAt:null,date:ny+(A.cfg.date||"2027-02-10").slice(4),dateConfirmed:false,ageDate:yr+"-12-31",name:String(A.cfg.name||"").includes(yr)?A.cfg.name.replace(yr,ny):A.cfg.name}));
   A.heats=[];A.times={};A.finish={};A.slips={};A.extras=[];A.roster={F:[],M:[]};A.records=recs;A.counter=1;A.s.mtov={};mtSave();
-  A.o.newMsg="The "+yr+" carnival is kept (look only, open it from Change carnival). The "+ny+" carnival is ready. Race number back to 1. Load the new student list in section 2 and check the date in section 1.";
+  A.o.newMsg="The "+yr+" carnival is kept (look only, open it from "+chgLabel()+"). The "+ny+" carnival is ready. Race number back to 1. Load the new student list in section 2 and check the date in section 1.";
   A.modal=null;recompute();render();
 }
 function parseRecordRows(text){
@@ -477,7 +477,11 @@ const ACT={...CARN_ACT,
   year:el=>{const v=el.dataset.v;if(v==="current"&&A.carn!==A.running){openCarn(A.running);return}if(/^carn/.test(v)){openCarn(v==="carna"?"":v.slice(4));return}enterYear(v)},
   changeyear:()=>{A.yearPicked=null;ssSet("swim_year",null);A.job=null;A.menu=false;render()},
   olanes:el=>{const b=document.getElementById("cLanes");b.textContent=Math.max(4,Math.min(10,(+b.textContent)+(+el.dataset.d)))},
-  osavedetails:()=>saveCfg({name:document.getElementById("cName").value.trim()||A.cfg.name,date:document.getElementById("cDate").value,dateConfirmed:document.getElementById("cDateOk").checked,ageDate:document.getElementById("cAge").value||"2026-12-31",pool:document.getElementById("cPool").value.trim(),poolLen:document.getElementById("cLen").value,lanes:+document.getElementById("cLanes").textContent},"Details saved"),
+  osavedetails:()=>{
+    /* Swim Opt 2.31: the second carnival's date cannot be in an earlier year than the first carnival's */
+    const dv=document.getElementById("cDate").value;
+    if(A.carn&&dv&&dv.slice(0,4)<carnYear("")){toast("The date must be in "+carnYear("")+" or later, the year of "+carnLabel("")+".");return}
+    return saveCfg({name:document.getElementById("cName").value.trim()||A.cfg.name,date:document.getElementById("cDate").value,dateConfirmed:document.getElementById("cDateOk").checked,ageDate:document.getElementById("cAge").value||"2026-12-31",pool:document.getElementById("cPool").value.trim(),poolLen:document.getElementById("cLen").value,lanes:+document.getElementById("cLanes").textContent},"Details saved")},
   opin:el=>{const v=el.dataset.v;const p=document.getElementById("pin-"+v).value.trim();
     if(!/^\d{4}$/.test(p)){toast("A PIN is 4 digits.");return}
     const h=pinHash(p);const P=pins();const clash=PIN_ROLES.find(([k])=>k!==v&&P[k]===h);

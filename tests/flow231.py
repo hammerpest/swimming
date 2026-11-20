@@ -41,7 +41,7 @@ async def main():
     await shot(O, "1-one-carnival")
     await O.click('[data-act=year][data-v=current]'); await O.click('.tile[data-job=organiser]')
     await O.click('[data-act=osec][data-v=students]'); await O.click('[data-act=otest]'); await O.click('[data-act=oimport]'); await O.wait_for_timeout(200)
-    check("2027" in await O.locator(".ttl b").inner_text() and "Change carnival" in await O.locator("header").inner_text(), "header: Change carnival")
+    check("2027" in await O.locator(".ttl b").inner_text() and "Change year" in await O.locator("header").inner_text(), "one carnival: the header keeps Change year")
 
     # the Marshal sends race 1 in the Secondary carnival
     M = await page("marshal", 1180, 820); await pin(M, "1111")
@@ -64,18 +64,22 @@ async def main():
     await O2.click('[data-act=year][data-v=carnb_]'); await reloaded(O2, "b_")
     check(await ev(O2, "A.yearPicked") == "current" and await ev(O2, "A.heats.length") == 0, "Primary opens with no races of its own")
     await O2.click('.tile[data-job=organiser]'); await O2.click('[data-act=osec][data-v=details]')
-    check("Primary" in await O2.locator(".ttl b").inner_text(), "header names 2027 Primary")
+    check("Primary" in await O2.locator(".ttl b").inner_text() and "Change carnival" in await O2.locator("header").inner_text(), "header names 2027 Primary, with Change carnival")
     box = await O2.locator(".msg.warn").first.inner_text()
     check("2027 Primary is not running." in box and await O2.locator("[data-act=mkrunask]").count() == 1, "details: not running box with its button")
     await shot(O2, "3-primary-details")
     # its date set to today (the morning question needs it)
-    today = datetime.date.today().isoformat()
-    await O2.fill("#cDate", today); await O2.click("[data-act=osavedetails]"); await O2.wait_for_timeout(300)
+    # a date before the first carnival's year is refused
+    await O2.fill("#cDate", "2026-11-20"); await O2.click("[data-act=osavedetails]"); await O2.wait_for_timeout(300)
+    check(await ev(O2, "A.cfg.date") != "2026-11-20", "a Primary date in 2026 (before 2027 Secondary) is refused")
+    # Primary on 11 February 2027; the page's clock is set to that day for the morning question
+    await O2.fill("#cDate", "2027-02-11"); await O2.click("[data-act=osavedetails]"); await O2.wait_for_timeout(300)
 
     # sign in again as the organiser: the morning question
+    await ev(O2, "todayIso=()=>'2027-02-11'")
     await ev(O2, "signOut()"); await O2.wait_for_timeout(200); await pin(O2, "9999"); await O2.wait_for_timeout(300)
     mod = await O2.locator(".modal").inner_text() if await O2.locator(".modal").count() else ""
-    check("Today is the" in mod and "Primary carnival" in mod, "morning question on Primary's date " + repr(mod[:80]))
+    check("Today is the 2027 Primary carnival" in mod, "morning question on Primary's date " + repr(mod[:80]))
     await shot(O2, "4-morning")
     await O2.click("[data-act=mkrun]"); await O2.wait_for_timeout(300)
     check(await ev(O2, "A.running") == "b_", "Primary is now the running carnival")
