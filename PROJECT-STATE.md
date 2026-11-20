@@ -1,6 +1,8 @@
 # PROJECT-STATE: CCAS Swimming Carnival App
 
-Date: 21 November 2026, version b. Replaces 21 November version a and all earlier PROJECT-STATE files.
+Date: 21 November 2026, version c. Replaces 21 November version b and all earlier PROJECT-STATE files.
+
+Changes on 21 November 2026 (version c): Jordan said "ok do both but remove the gold outline around the 2027 carnival": both S1.49 changes approved for building (decision 197). S1.49 version 2 drawn (Option C, fill and 3 px outline, no gold outline round the year title). Question 96 answered by 198 (same six PINs), question 97 by 199 (one carnival runs at a time). Question 95 explained again; still open. Not built yet: the build plan follows question 95. Next numbers: decision 200, question 98, design S1.50.
 
 Changes on 21 November 2026 (version b): Version a pushed to main (fee519b; test tools and notes only, the app is unchanged). Jordan asked for two changes, mock-up first: (1) one year can hold more than one carnival, Secondary and Primary each with its own Swim Carnival 2027 (follows decision 160); (2) on the Which carnival screen each carnival needs a clear clickable area (shading always on, a thick outline, or both). Drawn as design S1.49 (https://claude.ai/artifact/CfwXdYhjUHPP4QMaSK3Ydp): real app shots at MacBook and iPhone sizes in both themes, Option A (fill always on), B (3 px outline), C (both, suggested); cards named "2027 Secondary" and "2027 Primary", "Running now" and "Not running" chips, "Add a carnival for 2027 (Primary or Secondary)". Not built. Ask now: questions 94 to 97. Next numbers: decision 197, question 98, design S1.50.
 
@@ -1283,6 +1285,9 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 163. (9 November 2026, answers question 78) Primary relays have two groups: Junior (ages 8, 9, 10) and Senior (ages 11, 12). Read as applying to both the freestyle and medley relays.
 162. (9 November 2026, answers question 77) Primary results go to the same next level as high school, in the same HY3 file layout (2.29, 2.30).
 161. (9 November 2026, answers question 76) Primary students swim every 50 m race (fly, back, free, breast), the 100 m freestyle and the 4 x 50 m relays. No 200 m freestyle for primary.
+199. (21 November 2026, answers question 97) Primary and Secondary never run at the same time (usually a day apart). Only one carnival runs at a time; the Organiser chooses which.
+198. (21 November 2026, answers question 96) Primary and Secondary use the same six PINs.
+197. (21 November 2026) Jordan said "ok do both but remove the gold outline around the 2027 carnival": build S1.49 version 2 (https://claude.ai/artifact/CfwXdYhjUHPP4QMaSK3Ydp). (a) Which carnival cards: pale yellow fill always on plus a 3 px outline (navy in light, white in dark), rounded, navy on hover; no gold outline round the year title. (b) One year can hold two carnivals, Secondary and Primary, each with its own students, program, races, results and house points; cards read "2027 Secondary" and "2027 Primary" with "Running now" or "Not running"; "Add a carnival for 2027 (Primary or Secondary)". Visible change approved.
 196. (21 November 2026) The test scripts get the new staging PINs, kept on Jordan's Mac only (in ~/.ccas-swim-staging-pins.json, made by tools/set_staging_pins.py), never in the repo. Staging keeps Jordan's new PINs. Test mode keeps the test PINs.
 195. (16 November 2026, answers finding 10) The Place Judge phone's bottom bar (Undo last, Next race) stays as it is. Jordan checks on a real iPhone in the solo run whether it covers Go to race and Start again; the page already scrolls them clear.
 194. (16 November 2026, answers finding 8) Time Slips: once the Recorder has typed every lane of a race (or checked it), the phone shows the sent layout with the green line "Race N times are in from the Recorder. No photo needed." and Next race, even after refused photos. Built in 2.30.
@@ -1400,10 +1405,10 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 ## 6. Unresolved questions (ask Jordan)
 
 Ask now (asked 21 November 2026, no answer yet):
-- 94. (S1.49) Which carnival card style: A (fill always on), B (thick outline) or C (both, suggested)?
 - 95. (S1.49) Two carnivals in one year: helper PINs open the one the Organiser marks "Running now" (helpers never pick, as decision 95), or should helpers pick too?
-- 96. (S1.49) The same six PINs for Primary and Secondary, or separate PINs?
-- 97. (S1.49) Will Primary and Secondary ever run on the same day at the same time? If not, one running carnival at a time is simpler and safer (the other is kept aside and swapped in by the Organiser).
+- (Closed by 197) 94. Card style.
+- (Closed by 198) 96. Same PINs.
+- (Closed by 199) 97. Same day at the same time.
 - 92. (from version d) Problem 27's read-only check: Jordan reran the 2.30 SQL before the check, so it can only show the server is right now. Suggested: close it, unless the solo run shows a typed time replaced.
 - 93. (check 3 on 2.30) Keep or change, each a visible change: (a) the phone Place Judge needs a scroll for Start again while the two-judge note shows; (b) the phone toast "Another Place Judge changed the places for Race N." wraps to 3 lines; (c) Time Slips still says "Replace this slip with a new photo" when the Recorder typed the race.
 - (Closed by 181) 86. (12 November 2026, S1.46) How far should the landing look go: parents page only, parents page and PIN screens, or every screen? Suggested: parents page and PIN screens before February; job screens after the carnival.
@@ -1523,7 +1528,7 @@ Done: Swim Opt 2.7 on both links (3 November 2026: the job review's must-fix lis
 ## 8. Files and links
 
 - PROJECT-STATE.md in the repo, 21 November 2026 version b (this file; the latest)
-- Design S1.49, Which carnival cards and two carnivals in one year (21 November 2026, not approved yet): https://claude.ai/artifact/CfwXdYhjUHPP4QMaSK3Ydp
+- Design S1.49 version 2, Which carnival cards and two carnivals in one year (21 November 2026, approved, decision 197): https://claude.ai/artifact/CfwXdYhjUHPP4QMaSK3Ydp
 - Landing page for onlinecarnivals.au: landing/index.html (Swim Opt 2.21; moves to the hammerpest.github.io repo when the domain goes live)
 - Job review reports (3 November 2026): side-session notes folder local_3875fa25-d29d-4ed1-9ae2-3c6788ef88db/job-review/ (COMBINED.md and one file per job), outside the repo
 - CLAUDE.md (repo rules, how to run and test), HANDOVER.md (original handover), SETUP.md (Jordan's Supabase steps)
