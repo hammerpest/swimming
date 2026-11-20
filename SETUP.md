@@ -76,6 +76,16 @@ Check for the late multitimer time (problem 27), read only: press **+ New query*
 select tgname, pg_get_functiondef('private.times_slip_merge'::regproc) like '%''multi''%' as handles_multitimer from pg_trigger where tgrelid = 'public.times'::regclass and not tgisinternal;
 ```
 
+## 7. Two carnivals in one year (Swim Opt 2.31)
+
+Swim Opt 2.31 lets a year hold a Secondary and a Primary carnival. Run both files once on the project:
+
+1. Open the project, press **SQL Editor**, then **+ New query**.
+2. Open `supabase/01-setup.sql` (the 2.31 version) in TextEdit, press Cmd+A then Cmd+C, click in the query box, press Cmd+V, then **Run**. It should say **Success. No rows returned**. It keeps every race, PIN and setting.
+3. Press **+ New query** again (always a new one). Do the same with `supabase/03-parent-results.sql`. Again **Success. No rows returned**.
+
+Until this is run, the app works as before with one carnival; "Add a carnival" says to run this first.
+
 ## Before the carnival
 
 - Free projects pause after 7 days with nobody using them. The data is kept. To wake one, open the dashboard and press **Restore project**. Do this the day before the carnival.
