@@ -1,6 +1,8 @@
 # PROJECT-STATE: CCAS Swimming Carnival App
 
-Date: 21 November 2026, version e. Replaces 21 November version d and all earlier PROJECT-STATE files.
+Date: 21 November 2026, version f. Replaces 21 November version e and all earlier PROJECT-STATE files.
+
+Changes on 21 November 2026 (version f): Jordan answered question 99 ("i want to be able to easy switch. Anything else could be a problem"): Start a new carnival keeps and moves on only the carnival it is pressed in, as built in 2.31 (decision 201). No code change. Next: Jordan runs SETUP.md section 7 on staging and says when to push 2.31. Next numbers: decision 202, question 100, design S1.50.
 
 Changes on 21 November 2026 (version e): Jordan said "OK, build it" to S1.49 version 3 (decision 200; answers questions 95 and 98). Built as Swim Opt 2.31 (section 2.52), on branch claude/adoring-cerf-5aae2a, not pushed. Checks 1 to 3 passed (2.52). One call made in the build, to confirm (question 99): Start a new carnival keeps and moves on only the carnival it is pressed in, not both. SQL step for Jordan before the second carnival can be added on staging: SETUP.md section 7 (01-setup.sql and 03-parent-results.sql). Next numbers: decision 201, question 100, design S1.50.
 
@@ -1305,6 +1307,7 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 199. (21 November 2026, answers question 97) Primary and Secondary never run at the same time (usually a day apart). Only one carnival runs at a time; the Organiser chooses which.
 198. (21 November 2026, answers question 96) Primary and Secondary use the same six PINs.
 197. (21 November 2026) Jordan said "ok do both but remove the gold outline around the 2027 carnival": build S1.49 version 2 (https://claude.ai/artifact/CfwXdYhjUHPP4QMaSK3Ydp). (a) Which carnival cards: pale yellow fill always on plus a 3 px outline (navy in light, white in dark), rounded, navy on hover; no gold outline round the year title. (b) One year can hold two carnivals, Secondary and Primary, each with its own students, program, races, results and house points; cards read "2027 Secondary" and "2027 Primary" with "Running now" or "Not running"; "Add a carnival for 2027 (Primary or Secondary)". Visible change approved.
+201. (21 November 2026, answers question 99) Start a new carnival keeps and moves on only the carnival it is pressed in; the other carnival is not touched. Jordan wants to switch between the two carnivals easily and keep each separate. As built in 2.31.
 200. (21 November 2026, answers questions 95 and 98) Jordan said "OK, build it": every job PIN opens the running carnival; the Organiser switches it with the morning question (on the other carnival's date, once per sign-in, Not yet or Make running) or the button in 1. Carnival details; it never switches by itself. The header names the open carnival; Change year becomes Change carnival. Built as Swim Opt 2.31.
 196. (21 November 2026) The test scripts get the new staging PINs, kept on Jordan's Mac only (in ~/.ccas-swim-staging-pins.json, made by tools/set_staging_pins.py), never in the repo. Staging keeps Jordan's new PINs. Test mode keeps the test PINs.
 195. (16 November 2026, answers finding 10) The Place Judge phone's bottom bar (Undo last, Next race) stays as it is. Jordan checks on a real iPhone in the solo run whether it covers Go to race and Start again; the page already scrolls them clear.
@@ -1423,7 +1426,7 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 ## 6. Unresolved questions (ask Jordan)
 
 Ask now (asked 21 November 2026, no answer yet):
-- 99. (Swim Opt 2.31) Start a new carnival works on the carnival it is pressed in: it keeps that carnival as its own past year (for example 2027 Primary) and moves only that one to 2028. The other carnival is kept and moved when its own Start a new carnival is pressed. (The S1.49 page said "keeps both".) OK, or should one press keep and move both?
+- (Closed by 201) 99. (Swim Opt 2.31) Start a new carnival works on the carnival it is pressed in: it keeps that carnival as its own past year (for example 2027 Primary) and moves only that one to 2028. The other carnival is kept and moved when its own Start a new carnival is pressed. (The S1.49 page said "keeps both".) OK, or should one press keep and move both?
 - (Closed by 200) 98. (S1.49 version 3) OK to build the running carnival as drawn: every job PIN opens the running carnival; the Organiser switches it with the morning question (on the other carnival's date) or the button in 1. Carnival details; it never switches by itself. This also answers question 95.
 - (Closed by 197) 94. Card style.
 - (Closed by 198) 96. Same PINs.
