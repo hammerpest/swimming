@@ -1,6 +1,8 @@
 # PROJECT-STATE: CCAS Swimming Carnival App
 
-Date: 21 November 2026, version c. Replaces 21 November version b and all earlier PROJECT-STATE files.
+Date: 21 November 2026, version d. Replaces 21 November version c and all earlier PROJECT-STATE files.
+
+Changes on 21 November 2026 (version d): Jordan asked what the "helper PINs" are (Claude's word for the five job PINs) and where the running carnival is set. Answered question 95 in principle: every job PIN opens the running carnival, set by the Organiser, never switched by itself. Jordan said "yes add it to the mock up": S1.49 version 3 drawn (same link): a morning question after the Organiser PIN on the other carnival's date ("Today is the 2027 Primary carnival", Not yet or Make Primary running), and a yellow "not running" box with a button at the top of 1. Carnival details (green line on the running one); the header names the open carnival and "Change year" becomes "Change carnival". Ask now: question 98 (OK version 3?). Next numbers: decision 200, question 99, design S1.50.
 
 Changes on 21 November 2026 (version c): Jordan said "ok do both but remove the gold outline around the 2027 carnival": both S1.49 changes approved for building (decision 197). S1.49 version 2 drawn (Option C, fill and 3 px outline, no gold outline round the year title). Question 96 answered by 198 (same six PINs), question 97 by 199 (one carnival runs at a time). Question 95 explained again; still open. Not built yet: the build plan follows question 95. Next numbers: decision 200, question 98, design S1.50.
 
@@ -1405,7 +1407,7 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 ## 6. Unresolved questions (ask Jordan)
 
 Ask now (asked 21 November 2026, no answer yet):
-- 95. (S1.49) Two carnivals in one year: helper PINs open the one the Organiser marks "Running now" (helpers never pick, as decision 95), or should helpers pick too?
+- 98. (S1.49 version 3) OK to build the running carnival as drawn: every job PIN opens the running carnival; the Organiser switches it with the morning question (on the other carnival's date) or the button in 1. Carnival details; it never switches by itself. This also answers question 95.
 - (Closed by 197) 94. Card style.
 - (Closed by 198) 96. Same PINs.
 - (Closed by 199) 97. Same day at the same time.
