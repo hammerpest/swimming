@@ -1,6 +1,8 @@
 # PROJECT-STATE: CCAS Swimming Carnival App
 
-Date: 21 November 2026, version a. Replaces 16 November version d and all earlier PROJECT-STATE files.
+Date: 21 November 2026, version b. Replaces 21 November version a and all earlier PROJECT-STATE files.
+
+Changes on 21 November 2026 (version b): Version a pushed to main (fee519b; test tools and notes only, the app is unchanged). Jordan asked for two changes, mock-up first: (1) one year can hold more than one carnival, Secondary and Primary each with its own Swim Carnival 2027 (follows decision 160); (2) on the Which carnival screen each carnival needs a clear clickable area (shading always on, a thick outline, or both). Drawn as design S1.49 (https://claude.ai/artifact/CfwXdYhjUHPP4QMaSK3Ydp): real app shots at MacBook and iPhone sizes in both themes, Option A (fill always on), B (3 px outline), C (both, suggested); cards named "2027 Secondary" and "2027 Primary", "Running now" and "Not running" chips, "Add a carnival for 2027 (Primary or Secondary)". Not built. Ask now: questions 94 to 97. Next numbers: decision 197, question 98, design S1.50.
 
 Changes on 21 November 2026 (version a): fresh session after the handover. Jordan answered the open PIN question: the test scripts get the new staging PINs, kept on Jordan's Mac only (decision 196). Built (test tools only, no app change, no Swim Opt number): tests/pins.py and tools/set_staging_pins.py; tests/flow.py and tests/supabase_live.py read the staging PINs from ~/.ccas-swim-staging-pins.json (outside every repo), and stop with a message if it is missing; test mode still uses the test PINs. flow.py in test mode passes. Section 0 brought up to date (it still said 2.26 and listed the test PINs as the staging PINs). Next: Jordan runs tools/set_staging_pins.py once (step 41), then the solo run on real devices (step 42). Asked, waiting: questions 92 (close problem 27's read-only check) and 93 (the three 2.30 check 3 notes). Next numbers: decision 197, question 94, design S1.49.
 
@@ -1398,6 +1400,10 @@ Also: STOP with fewer splits than swimmers asks first; Fix splits deletes a doub
 ## 6. Unresolved questions (ask Jordan)
 
 Ask now (asked 21 November 2026, no answer yet):
+- 94. (S1.49) Which carnival card style: A (fill always on), B (thick outline) or C (both, suggested)?
+- 95. (S1.49) Two carnivals in one year: helper PINs open the one the Organiser marks "Running now" (helpers never pick, as decision 95), or should helpers pick too?
+- 96. (S1.49) The same six PINs for Primary and Secondary, or separate PINs?
+- 97. (S1.49) Will Primary and Secondary ever run on the same day at the same time? If not, one running carnival at a time is simpler and safer (the other is kept aside and swapped in by the Organiser).
 - 92. (from version d) Problem 27's read-only check: Jordan reran the 2.30 SQL before the check, so it can only show the server is right now. Suggested: close it, unless the solo run shows a typed time replaced.
 - 93. (check 3 on 2.30) Keep or change, each a visible change: (a) the phone Place Judge needs a scroll for Start again while the two-judge note shows; (b) the phone toast "Another Place Judge changed the places for Race N." wraps to 3 lines; (c) Time Slips still says "Replace this slip with a new photo" when the Recorder typed the race.
 - (Closed by 181) 86. (12 November 2026, S1.46) How far should the landing look go: parents page only, parents page and PIN screens, or every screen? Suggested: parents page and PIN screens before February; job screens after the carnival.
@@ -1516,7 +1522,8 @@ Done: Swim Opt 2.7 on both links (3 November 2026: the job review's must-fix lis
 
 ## 8. Files and links
 
-- PROJECT-STATE.md in the repo, 21 November 2026 version a (this file; the latest)
+- PROJECT-STATE.md in the repo, 21 November 2026 version b (this file; the latest)
+- Design S1.49, Which carnival cards and two carnivals in one year (21 November 2026, not approved yet): https://claude.ai/artifact/CfwXdYhjUHPP4QMaSK3Ydp
 - Landing page for onlinecarnivals.au: landing/index.html (Swim Opt 2.21; moves to the hammerpest.github.io repo when the domain goes live)
 - Job review reports (3 November 2026): side-session notes folder local_3875fa25-d29d-4ed1-9ae2-3c6788ef88db/job-review/ (COMBINED.md and one file per job), outside the repo
 - CLAUDE.md (repo rules, how to run and test), HANDOVER.md (original handover), SETUP.md (Jordan's Supabase steps)
