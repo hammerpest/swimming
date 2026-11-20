@@ -71,7 +71,7 @@ No Homebrew or admin on Jordan's Mac. Tools live in `../.venv` (Python 3.9 with 
 - Flow (test mode): `../.venv/bin/python tests/flow.py "http://127.0.0.1:8102/?mode=local"`, run from a scratch folder (it writes `flow-shots/`).
 - Swim Opt 2.7 features (test mode): `../.venv/bin/python tests/flow27.py "http://127.0.0.1:8102/?mode=local"`, run from a scratch folder (it writes `flow27-shots/`).
 - Check 1: `tests/baseline_shots.py "http://127.0.0.1:8102/?mode=local" <out>` (about 5 minutes), then `tests/visual_diff.py baseline-mac <out>`.
-- Live (staging project only; it clears the carnival data): `../.venv/bin/python tests/supabase_live.py http://127.0.0.1:8102/`. Each run signs in about 25 test devices and the project allows 100 anonymous sign-ins an hour, so leave about 20 minutes between runs, or failures are the limit, not the app.
+- Live (staging project only; it clears the carnival data): `../.venv/bin/python tests/supabase_live.py http://127.0.0.1:8102/`. Each run signs in about 25 test devices and the project allows 100 anonymous sign-ins an hour, so leave about 20 minutes between runs, or failures are the limit, not the app. It reads the staging PINs from `~/.ccas-swim-staging-pins.json` (made by `tools/set_staging_pins.py`, decision 196) and stops if it is missing. Never write the staging PINs anywhere.
 
 ## Privacy
 

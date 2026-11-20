@@ -4,6 +4,9 @@ from playwright.async_api import async_playwright
 import sys, os
 URL=sys.argv[1] if len(sys.argv)>1 else 'http://localhost:8000/'
 LIVE='mode=local' not in URL  # Supabase: the real site's rules apply
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
+from pins import pins
+P=pins(URL)  # test PINs in test mode; ~/.ccas-swim-staging-pins.json on staging (decision 196)
 os.makedirs('flow-shots',exist_ok=True)
 os.chdir('flow-shots')
 errs=[]
@@ -27,14 +30,14 @@ async def main():
     O=await mk('org')()
     await pin(O,'0000'); await O.wait_for_timeout(100)
     await O.screenshot(path='s_wrongpin.png')
-    await pin(O,'9999'); await O.screenshot(path='s_yearpick0.png'); await O.click('[data-act=year][data-v=current]'); await O.screenshot(path='s_home_org.png')
+    await pin(O,P['org']); await O.screenshot(path='s_yearpick0.png'); await O.click('[data-act=year][data-v=current]'); await O.screenshot(path='s_home_org.png')
     await O.click('[data-job=organiser]')
     await O.click('[data-act=osec][data-v=students]'); await O.click('[data-act=otest]'); await O.screenshot(path='s_org_students.png',full_page=True)
     await O.click('[data-act=oimport]'); await O.wait_for_timeout(200)
     await O.click('[data-act=osec][data-v=records]'); await O.click('[data-act=orectest]'); await O.wait_for_timeout(200)
     M=await mk('mar')()
     await M.set_viewport_size({'width':1180,'height':820})
-    await pin(M,'1111'); await M.wait_for_timeout(100)
+    await pin(M,P['marshal']); await M.wait_for_timeout(100)
     await M.click('[data-act=mgo]'); await M.wait_for_timeout(100); await M.screenshot(path='s_m_notready.png')
     await M.click('[data-act=closemodal]')
     await M.click('[data-act=mpick][data-v=back50]'); await M.click('[data-act=mpick][data-v=F]'); await M.click('[data-act=mpick][data-f=g][data-v="14"]')
@@ -50,7 +53,7 @@ async def main():
     await M.screenshot(path='s_m_after.png')
     J=await mk('judge')()
     await J.set_viewport_size({'width':1180,'height':820})
-    await pin(J,'2222'); await J.wait_for_timeout(200)
+    await pin(J,P['judge']); await J.wait_for_timeout(200)
     for l in [5,4,1,2]: await J.click(f'[data-act=jtap][data-l="{l}"]'); await J.wait_for_timeout(50)
     await J.screenshot(path='s_j1.png')
     await J.click('[data-act=jnext]'); await J.wait_for_timeout(100)
@@ -61,17 +64,17 @@ async def main():
     if LIVE:
         # on the real site the Time Slips PIN reads the photo for real and has no practice buttons (A4);
         # the Organiser PIN opens Time Slips with them, so the made-up reads below work the same as in test mode
-        await pin(S,'9999'); await S.click('[data-act=year][data-v=current]'); await S.click('.tile[data-job=slips]'); await S.wait_for_timeout(300)
+        await pin(S,P['org']); await S.click('[data-act=year][data-v=current]'); await S.click('.tile[data-job=slips]'); await S.wait_for_timeout(300)
         await S.click('[data-act=stest][data-v=good]')
     else:
-        await pin(S,'4444'); await S.wait_for_timeout(200)
+        await pin(S,P['slips']); await S.wait_for_timeout(200)
     await S.screenshot(path='s_s1.png')
     await S.set_input_files('#camin',os.path.join(os.path.dirname(os.path.abspath(__file__)),'slip.jpg')); await S.wait_for_timeout(300); await S.screenshot(path='s_s_flash.png')
     await S.wait_for_timeout(1500); await S.screenshot(path='s_s2.png')
     await S.click('[data-act=snext]'); await S.click('[data-act=stest][data-v=wrong]'); await S.set_input_files('#camin',os.path.join(os.path.dirname(os.path.abspath(__file__)),'slip.jpg')); await S.wait_for_timeout(400); await S.screenshot(path='s_s_wrong.png')
     await S.click('[data-act=stest][data-v=good]'); await S.set_input_files('#camin',os.path.join(os.path.dirname(os.path.abspath(__file__)),'slip.jpg')); await S.wait_for_timeout(1500)
     R=await mk('rec')()
-    await pin(R,'3333'); await R.wait_for_timeout(300)
+    await pin(R,P['recorder']); await R.wait_for_timeout(300)
     # B1: a Recorder opens on the first race that needs work; go to Race 1 for these steps
     await R.click('[data-act=rgoto]'); await R.click('[data-act=pickrace][data-race="1"]'); await R.wait_for_timeout(100)
     await R.fill('#t-1-3','7512'); await R.press('#t-1-3','Enter'); await R.wait_for_timeout(100)
@@ -84,15 +87,15 @@ async def main():
     await R.screenshot(path='s_r2.png',full_page=True)
     An=await mk('ann')()
     await An.set_viewport_size({'width':1180,'height':820})
-    await pin(An,'5555'); await An.wait_for_timeout(300)
+    await pin(An,P['announcer']); await An.wait_for_timeout(300)
     await An.screenshot(path='s_ann.png',full_page=True)
     await An.click('[data-act=goto][data-job=results]'); await An.wait_for_timeout(200); await An.screenshot(path='s_res.png',full_page=True)
     await An.click('[data-act=goto][data-job=houses]'); await An.wait_for_timeout(200); await An.screenshot(path='s_houses.png',full_page=True)
     await An.click('[data-act=menu]'); await An.screenshot(path='s_menu.png'); await M.click('[data-act=menu]'); await M.screenshot(path='s_menu_m.png')
     await O.click('[data-act=osec][data-v=details]'); await O.screenshot(path='s_org_pins.png',full_page=True); await O.click('[data-act=menu]'); await O.screenshot(path='s_menu_org.png')
-    ph=await mk('phone')(); await ph.set_viewport_size({'width':390,'height':844}); await pin(ph,'9999'); await ph.click('[data-act=year][data-v=current]'); await ph.screenshot(path='s_home_phone.png',full_page=True)
+    ph=await mk('phone')(); await ph.set_viewport_size({'width':390,'height':844}); await pin(ph,P['org']); await ph.click('[data-act=year][data-v=current]'); await ph.screenshot(path='s_home_phone.png',full_page=True)
     await O.click('[data-act=menu]')
-    await O.click('[data-act=osec][data-v=lock]'); await O.click('[data-act=onew]'); await O.fill('#ncPin','9999'); await O.click('[data-act=onew1]'); await O.wait_for_timeout(100); await O.click('[data-act=onew2][data-v=yes]'); await O.wait_for_timeout(1500)
+    await O.click('[data-act=osec][data-v=lock]'); await O.click('[data-act=onew]'); await O.fill('#ncPin',P['org']); await O.click('[data-act=onew1]'); await O.wait_for_timeout(100); await O.click('[data-act=onew2][data-v=yes]'); await O.wait_for_timeout(1500)
     await O.screenshot(path='s_new.png',full_page=True)
     await O.click('[data-act=changeyear]'); await O.wait_for_timeout(300); await O.screenshot(path='s_yearpick.png',full_page=True)
     await O.click('[data-act=year][data-v="2027"]'); await O.wait_for_timeout(500)

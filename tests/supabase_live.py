@@ -5,13 +5,16 @@ Covers: the six-device flow (tests/flow.py) and what it saved, two marshals at o
 the phone offline, and the security rules (no PIN, wrong job, past year)."""
 import asyncio, json, os, re, subprocess, sys, time, urllib.request, urllib.error
 from playwright.async_api import async_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pins import pins, pin_hash
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8102/"
 cfg = open(os.path.join(ROOT, "js", "config.js")).read()
 SB = re.search(r'url:"([^"]+)"', cfg).group(1); KEY = re.search(r'key:"([^"]+)"', cfg).group(1)
-HASH = {"marshal": "ad5c28bc", "judge": "e71d4378", "recorder": "37799a1c", "slips": "ac6c05b0", "announcer": "de198c1c", "org": "276fbdc"}
+P = pins(URL)  # staging PINs from ~/.ccas-swim-staging-pins.json (decision 196)
+HASH = {j: pin_hash(c) for j, c in P.items()}
 TABLES = ["config", "roster", "extras", "heats", "times", "finish", "slips", "records", "counter", "years", "archive"]
 fails = []
 def check(ok, name):
@@ -98,7 +101,7 @@ async def main():
         ctx = await b.new_context(viewport={"width": 1512, "height": 982})
 
         # 2. two marshals pressing at once
-        M1 = await page(ctx, "m1", "1111"); M2 = await page(ctx, "m2", "1111")
+        M1 = await page(ctx, "m1", P["marshal"]); M2 = await page(ctx, "m2", P["marshal"])
         js = "Promise.all(Array.from({length:15},()=>A.store.nextRace()))"
         a1, a2 = await asyncio.gather(M1.evaluate(js), M2.evaluate(js))
         got = sorted(a1 + a2)
@@ -114,8 +117,8 @@ async def main():
 
         # 3. two Recorders on one race: the second is locked, and freed when the first drops out
         ctxR1 = await b.new_context(viewport={"width": 1512, "height": 982})
-        R1 = await page(ctxR1, "r1", "3333"); await asyncio.sleep(3)
-        R2 = await page(ctx, "r2", "3333")
+        R1 = await page(ctxR1, "r1", P["recorder"]); await asyncio.sleep(3)
+        R2 = await page(ctx, "r2", P["recorder"])
         LOCK = "Being entered by another device"
         check(await wait_for(lambda: R2.evaluate(f"document.body.innerText.includes('{LOCK}')"), 15), "second Recorder on Race 1 is locked")
         check(not await R1.evaluate(f"document.body.innerText.includes('{LOCK}')"), "first Recorder is not locked")
@@ -125,7 +128,7 @@ async def main():
         # 4. the phone offline: the photo waits on the phone and sends by itself later
         ctxP = await b.new_context(viewport={"width": 390, "height": 844})
         # the Organiser PIN opens Time Slips with the practice reader (A4), so the photo needs no real slip read
-        P = await page(ctxP, "phone", "9999"); await P.click('[data-act=year][data-v=current]'); await P.click('.tile[data-job=slips]')
+        P = await page(ctxP, "phone", P["org"]); await P.click('[data-act=year][data-v=current]'); await P.click('.tile[data-job=slips]')
         await asyncio.sleep(2); await P.click('[data-act=stest][data-v=good]')
         await ctxP.set_offline(True)
         await P.set_input_files("#camin", os.path.join(HERE, "slip.jpg"))
